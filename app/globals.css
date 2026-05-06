@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f0f1a;
+  --card: #1a1a2e;
+  --border: #2a2a4a;
+  --accent: #6c63ff;
+  --accent2: #ff6584;
+  --text: #e2e8f0;
+  --muted: #64748b;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans JP', sans-serif;
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .card {
+    @apply bg-[#1a1a2e] border border-[#2a2a4a] rounded-2xl;
+  }
+  .btn-primary {
+    @apply bg-[#6c63ff] hover:bg-[#5a52e0] active:scale-95 text-white font-bold py-3 px-8 rounded-xl transition-all duration-150 cursor-pointer select-none;
+  }
+  .btn-secondary {
+    @apply bg-[#2a2a4a] hover:bg-[#3a3a5a] active:scale-95 text-white font-semibold py-3 px-8 rounded-xl transition-all duration-150 cursor-pointer select-none;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold py-3 px-8 rounded-xl transition-all duration-150 cursor-pointer select-none;
+  }
+  .game-container {
+    @apply max-w-lg mx-auto px-4 py-8 min-h-screen flex flex-col items-center justify-center;
+  }
+}
