@@ -151,10 +151,13 @@ export default function CalculationGame() {
 
             <input
               ref={inputRef}
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="-?[0-9]*"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => setInput(e.target.value.replace(/[^0-9-]/g, ""))}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              onBlur={() => { if (phase === "playing") setTimeout(() => inputRef.current?.focus(), 10); }}
               className={`w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all ${shake ? "border-red-500 animate-[shake_0.3s_ease]" : "border-[#2a2a4a]"}`}
               placeholder="答えを入力"
               autoComplete="off"
