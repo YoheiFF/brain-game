@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { getNickname, setNickname } from "@/lib/nickname";
+import { getNickname, setNickname, getAge, setAge } from "@/lib/nickname";
 
 interface Props {
   onClose: (nickname: string) => void;
@@ -9,12 +9,15 @@ interface Props {
 
 export default function NicknameModal({ onClose, mode = "setup" }: Props) {
   const [value, setValue] = useState("");
+  const [ageValue, setAgeValue] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (mode === "change") {
       setValue(getNickname() ?? "");
+      const age = getAge();
+      setAgeValue(age !== null ? String(age) : "");
     }
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [mode]);
@@ -23,6 +26,11 @@ export default function NicknameModal({ onClose, mode = "setup" }: Props) {
     const trimmed = value.trim();
     if (trimmed.length === 0) { setError("ニックネームを入力してください"); return; }
     if (trimmed.length > 12) { setError("12文字以内で入力してください"); return; }
+    if (ageValue !== "") {
+      const age = parseInt(ageValue, 10);
+      if (isNaN(age) || age < 1 || age > 120) { setError("年齢は1〜120で入力してください"); return; }
+      setAge(age);
+    }
     setNickname(trimmed);
     onClose(trimmed);
   };
@@ -33,28 +41,46 @@ export default function NicknameModal({ onClose, mode = "setup" }: Props) {
         <div className="text-5xl">🧠</div>
         <div className="text-center">
           <h2 className="text-2xl font-black text-white mb-1">
-            {mode === "setup" ? "ようこそ！" : "ニックネーム変更"}
+            {mode === "setup" ? "ようこそ！" : "プロフィール変更"}
           </h2>
           <p className="text-[#64748b] text-sm">
             {mode === "setup"
               ? "ランキングに表示されるニックネームを設定してください"
-              : "新しいニックネームを入力してください"}
+              : "プロフィールを変更してください"}
           </p>
         </div>
 
-        <div className="w-full">
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            onChange={(e) => { setValue(e.target.value); setError(""); }}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            maxLength={12}
-            placeholder="例: たろう, GameKing..."
-            className="w-full text-center text-xl font-bold bg-[#0f0f1a] border-2 border-[#2a2a4a] focus:border-[#6c63ff] rounded-xl p-3 text-white outline-none transition-all"
-          />
-          {error && <p className="text-red-400 text-xs mt-1 text-center">{error}</p>}
-          <p className="text-[#64748b] text-xs mt-1 text-right">{value.trim().length}/12</p>
+        <div className="w-full flex flex-col gap-3">
+          <div>
+            <label className="text-[#64748b] text-xs mb-1 block">ニックネーム</label>
+            <input
+              ref={inputRef}
+              type="text"
+              value={value}
+              onChange={(e) => { setValue(e.target.value); setError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              maxLength={12}
+              placeholder="例: たろう, GameKing..."
+              className="w-full text-center text-xl font-bold bg-[#0f0f1a] border-2 border-[#2a2a4a] focus:border-[#6c63ff] rounded-xl p-3 text-white outline-none transition-all"
+            />
+            <p className="text-[#64748b] text-xs mt-1 text-right">{value.trim().length}/12</p>
+          </div>
+
+          <div>
+            <label className="text-[#64748b] text-xs mb-1 block">年齢（任意）</label>
+            <input
+              type="number"
+              value={ageValue}
+              onChange={(e) => { setAgeValue(e.target.value); setError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              min={1}
+              max={120}
+              placeholder="例: 25"
+              className="w-full text-center text-xl font-bold bg-[#0f0f1a] border-2 border-[#2a2a4a] focus:border-[#6c63ff] rounded-xl p-3 text-white outline-none transition-all"
+            />
+          </div>
+
+          {error && <p className="text-red-400 text-xs text-center">{error}</p>}
         </div>
 
         <div className="flex gap-3 w-full">

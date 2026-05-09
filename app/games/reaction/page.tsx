@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname } from "@/lib/nickname";
+import { getNickname, getAge } from "@/lib/nickname";
+import { getBenchmark } from "@/lib/benchmarks";
 
 type Phase = "ready" | "waiting" | "go" | "tooEarly" | "result";
 
@@ -147,6 +148,7 @@ export default function ReactionGame() {
             onRetry={startGame}
             onHome={() => router.push("/")}
             lowerIsBetter
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("reaction", age); return { ...b, unit: "ms", lowerIsBetter: true }; })()}
           />
         )}
       </div>

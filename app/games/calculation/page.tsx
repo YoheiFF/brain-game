@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname } from "@/lib/nickname";
+import { getNickname, getAge } from "@/lib/nickname";
+import { getBenchmark } from "@/lib/benchmarks";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -40,7 +41,7 @@ function generateQuestion(): Question {
   return { a, b, op, answer };
 }
 
-const GAME_TIME = 60;
+const GAME_TIME = 30;
 
 export default function CalculationGame() {
   const router = useRouter();
@@ -116,13 +117,13 @@ export default function CalculationGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
-        <GameHeader title="計算ゲーム" description="60秒間でできるだけ多くの計算問題を解こう" />
+        <GameHeader title="計算ゲーム" description="30秒間でできるだけ多くの計算問題を解こう" />
 
         {phase === "ready" && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🧮</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
-              <p>制限時間: <span className="text-white font-bold">60秒</span></p>
+              <p>制限時間: <span className="text-white font-bold">30秒</span></p>
               <p>四則演算（+, -, ×, ÷）が出題されます</p>
               {best !== null && <p className="text-[#6c63ff]">自己ベスト: <span className="font-bold">{best}問</span></p>}
             </div>
@@ -149,22 +150,21 @@ export default function CalculationGame() {
               {question.a} {question.op} {question.b} = ?
             </div>
 
-            <input
-              ref={inputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="-?[0-9]*"
-              value={input}
-              onChange={(e) => setInput(e.target.value.replace(/[^0-9-]/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              onBlur={() => { if (phase === "playing") setTimeout(() => inputRef.current?.focus(), 10); }}
-              className={`w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all ${shake ? "border-red-500 animate-[shake_0.3s_ease]" : "border-[#2a2a4a]"}`}
-              placeholder="答えを入力"
-              autoComplete="off"
-            />
-            <button onClick={handleSubmit} className="btn-primary w-full">
-              決定 (Enter)
-            </button>
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="w-full">
+              <input
+                ref={inputRef}
+                type="text"
+                inputMode="numeric"
+                enterKeyHint="go"
+                pattern="-?[0-9]*"
+                value={input}
+                onChange={(e) => setInput(e.target.value.replace(/[^0-9-]/g, ""))}
+                onBlur={() => { if (phase === "playing") setTimeout(() => inputRef.current?.focus(), 10); }}
+                className={`w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all ${shake ? "border-red-500 animate-[shake_0.3s_ease]" : "border-[#2a2a4a]"}`}
+                placeholder="答えを入力"
+                autoComplete="off"
+              />
+            </form>
           </div>
         )}
 
@@ -176,6 +176,7 @@ export default function CalculationGame() {
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("calculation", age); return { ...b, unit: "問" }; })()}
           />
         )}
       </div>

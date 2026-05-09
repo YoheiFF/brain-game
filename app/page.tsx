@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAllPersonalBests, type GameId } from "@/lib/scores";
-import { getNickname, hasNickname } from "@/lib/nickname";
+import { getNickname, hasNickname, getAge } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
+import { getBenchmark } from "@/lib/benchmarks";
 
 const GAMES: {
   id: GameId;
@@ -24,6 +25,7 @@ const GAMES: {
 export default function Home() {
   const [bests, setBests] = useState<Partial<Record<GameId, number>>>({});
   const [nickname, setNickname] = useState<string | null>(null);
+  const [age, setAge] = useState<number | null>(null);
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [modalMode, setModalMode] = useState<"setup" | "change">("setup");
   const [mounted, setMounted] = useState(false);
@@ -33,6 +35,7 @@ export default function Home() {
     setBests(getAllPersonalBests());
     const nick = getNickname();
     setNickname(nick);
+    setAge(getAge());
     if (!hasNickname()) {
       setModalMode("setup");
       setShowNicknameModal(true);
@@ -41,6 +44,7 @@ export default function Home() {
 
   const handleNicknameClose = (nick: string) => {
     setNickname(nick);
+    setAge(getAge());
     setShowNicknameModal(false);
   };
 
@@ -63,7 +67,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <span className="text-[#64748b] text-xs">プレイヤー</span>
               <span className="text-white font-bold text-sm bg-[#1a1a2e] border border-[#2a2a4a] px-3 py-1 rounded-full">
-                {nickname}
+                {nickname}{age !== null ? ` (${age}歳)` : ""}
               </span>
               <button
                 onClick={() => { setModalMode("change"); setShowNicknameModal(true); }}
@@ -97,17 +101,28 @@ export default function Home() {
             </div>
             <h2 className="text-lg font-bold text-white mb-1">{game.title}</h2>
             <p className="text-[#64748b] text-sm mb-3">{game.description}</p>
-            {bests[game.id] !== undefined ? (
-              <div className="flex items-center gap-1">
-                <span className="text-yellow-400 text-xs">🏆 ベスト</span>
-                <span className="text-[#6c63ff] font-bold text-sm">
-                  {bests[game.id]}{game.unit}
-                </span>
-                {game.lowerIsBetter && <span className="text-[#64748b] text-xs">(低いほど良い)</span>}
-              </div>
-            ) : (
-              <span className="text-[#64748b] text-xs">まだプレイ履歴なし</span>
-            )}
+            <div className="flex flex-col gap-1">
+              {age !== null && (() => {
+                const { ageGroup, average } = getBenchmark(game.id, age);
+                return (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[#64748b] text-xs">📊 {ageGroup}平均</span>
+                    <span className="text-[#94a3b8] font-bold text-sm">{average}{game.unit}</span>
+                    {game.lowerIsBetter && <span className="text-[#64748b] text-xs">(低いほど良い)</span>}
+                  </div>
+                );
+              })()}
+              {bests[game.id] !== undefined ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-yellow-400 text-xs">🏆 ベスト</span>
+                  <span className="text-[#6c63ff] font-bold text-sm">
+                    {bests[game.id]}{game.unit}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[#64748b] text-xs">まだプレイ履歴なし</span>
+              )}
+            </div>
           </Link>
         ))}
       </div>

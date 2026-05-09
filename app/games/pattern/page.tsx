@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname } from "@/lib/nickname";
+import { getNickname, getAge } from "@/lib/nickname";
+import { getBenchmark } from "@/lib/benchmarks";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -190,6 +191,7 @@ export default function PatternGame() {
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("pattern", age); return { ...b, unit: "点" }; })()}
           />
         )}
       </div>

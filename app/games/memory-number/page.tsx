@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname } from "@/lib/nickname";
+import { getNickname, getAge } from "@/lib/nickname";
+import { getBenchmark } from "@/lib/benchmarks";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -23,6 +24,8 @@ export default function MemoryNumberGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [showIndex, setShowIndex] = useState(-1);
+  const [inputTimeLeft, setInputTimeLeft] = useState(0);
+  const inputTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setBest(getPersonalBest("memory-number"));
@@ -45,11 +48,39 @@ export default function MemoryNumberGame() {
         setTimeout(() => {
           setShowIndex(-1);
           setPhase("input");
+          setInputTimeLeft(seq.length + 3);
         }, SHOW_MS_PER_DIGIT);
       }
     };
     setTimeout(tick, SHOW_MS_PER_DIGIT);
   }, []);
+
+  useEffect(() => {
+    if (phase !== "input") {
+      if (inputTimerRef.current) clearInterval(inputTimerRef.current);
+      return;
+    }
+    inputTimerRef.current = setInterval(() => {
+      setInputTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(inputTimerRef.current!);
+          setPhase("wrong");
+          setTimeout(() => {
+            setSequence((seq) => {
+              const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト");
+              setBest(newBest);
+              setIsNewBest(newBest === level);
+              return seq;
+            });
+            setPhase("result");
+          }, 1200);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => { if (inputTimerRef.current) clearInterval(inputTimerRef.current); };
+  }, [phase, level]);
 
   const startGame = useCallback(() => {
     setLevel(3);
@@ -107,11 +138,14 @@ export default function MemoryNumberGame() {
             {phase === "showing" && (
               <>
                 <p className="text-[#64748b] text-sm">覚えてください...</p>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2 justify-center">
                   {sequence.map((n, i) => (
                     <div
                       key={i}
-                      className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl font-black transition-all duration-200 ${
+                      className={`rounded-xl flex items-center justify-center font-black transition-all duration-200 ${
+                        sequence.length <= 6 ? "w-14 h-14 text-3xl" :
+                        sequence.length <= 9 ? "w-10 h-10 text-2xl" : "w-8 h-8 text-xl"
+                      } ${
                         i === showIndex
                           ? "bg-[#6c63ff] text-white scale-110"
                           : i < showIndex
@@ -138,12 +172,20 @@ export default function MemoryNumberGame() {
 
             {phase === "input" && (
               <>
-                <p className="text-[#64748b] text-sm">入力してください</p>
+                <div className="flex items-center justify-between w-full">
+                  <p className="text-[#64748b] text-sm">入力してください</p>
+                  <p className={`text-sm font-bold ${inputTimeLeft <= 3 ? "text-red-400" : "text-yellow-400"}`}>
+                    {inputTimeLeft}s
+                  </p>
+                </div>
                 <div className="flex gap-2 flex-wrap justify-center">
                   {sequence.map((_, i) => (
                     <div
                       key={i}
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-black border-2 transition-all ${
+                      className={`rounded-xl flex items-center justify-center font-black border-2 transition-all ${
+                        sequence.length <= 6 ? "w-12 h-12 text-2xl" :
+                        sequence.length <= 9 ? "w-9 h-9 text-xl" : "w-7 h-7 text-lg"
+                      } ${
                         input[i] !== undefined
                           ? "border-[#6c63ff] bg-[#6c63ff]/10 text-white"
                           : i === input.length
@@ -214,6 +256,7 @@ export default function MemoryNumberGame() {
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("memory-number", age); return { ...b, unit: "桁" }; })()}
           />
         )}
       </div>
