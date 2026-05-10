@@ -6,6 +6,7 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -54,11 +55,13 @@ export default function StroopGame() {
   const [finalScore, setFinalScore] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
+  const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scoreRef = useRef(0);
 
   useEffect(() => {
     setBest(getPersonalBest("stroop"));
+    setRemaining(getRemainingPlays("stroop"));
   }, []);
 
   const endGame = useCallback(() => {
@@ -66,6 +69,8 @@ export default function StroopGame() {
     const s = scoreRef.current;
     setFinalScore(s);
     const newBest = saveScore("stroop", s, getNickname() ?? "ゲスト");
+    recordPlay("stroop", s);
+    setRemaining(getRemainingPlays("stroop"));
     setBest(newBest);
     setIsNewBest(newBest === s && s > 0);
     setPhase("result");
@@ -124,7 +129,18 @@ export default function StroopGame() {
               <p className="text-[#64748b] text-sm">制限時間: <span className="text-white font-bold">30秒</span></p>
               {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}点</span></p>}
             </div>
-            <button onClick={startGame} className="btn-primary w-full text-lg">スタート</button>
+            {remaining > 0 ? (
+              <button onClick={startGame} className="btn-primary w-full text-lg">
+                スタート（残り{remaining}回）
+              </button>
+            ) : (
+              <div className="text-center space-y-2">
+                <p className="text-red-400 font-bold text-sm">
+                  本日のプレイ上限（{MAX_PLAYS_PER_DAY}回）に達しました
+                </p>
+                <p className="text-[#64748b] text-xs">明日また挑戦しよう！</p>
+              </div>
+            )}
           </div>
         )}
 

@@ -205,3 +205,13 @@ export function getOverallRanking(): OverallEntry[] {
     .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }
+
+/** 全ゲームの累計プレイ回数を返す */
+export function getTotalPlayCount(): number {
+  const rankings = loadRankings()
+  let total = 0
+  for (const gameId of GAME_IDS) {
+    total += (rankings[gameId] ?? []).length
+  }
+  return total
+}

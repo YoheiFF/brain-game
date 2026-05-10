@@ -6,6 +6,7 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -55,6 +56,7 @@ export default function CalculationGame() {
   const [finalScore, setFinalScore] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
+  const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -62,6 +64,8 @@ export default function CalculationGame() {
     if (timerRef.current) clearInterval(timerRef.current);
     setFinalScore(currentScore);
     const newBest = saveScore("calculation", currentScore, getNickname() ?? "ゲスト");
+    recordPlay("calculation", currentScore);
+    setRemaining(getRemainingPlays("calculation"));
     setBest(newBest);
     setIsNewBest(newBest === currentScore && currentScore > 0);
     setPhase("result");
@@ -78,6 +82,7 @@ export default function CalculationGame() {
 
   useEffect(() => {
     setBest(getPersonalBest("calculation"));
+    setRemaining(getRemainingPlays("calculation"));
   }, []);
 
   useEffect(() => {
@@ -112,7 +117,7 @@ export default function CalculationGame() {
   }, [input, phase, question.answer]);
 
   const timerColor =
-    timeLeft > 30 ? "text-green-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
+    timeLeft > 20 ? "text-green-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
 
   return (
     <div className="game-container">
@@ -127,9 +132,18 @@ export default function CalculationGame() {
               <p>四則演算（+, -, ×, ÷）が出題されます</p>
               {best !== null && <p className="text-[#6c63ff]">自己ベスト: <span className="font-bold">{best}問</span></p>}
             </div>
-            <button onClick={startGame} className="btn-primary w-full text-lg">
-              スタート
-            </button>
+            {remaining > 0 ? (
+              <button onClick={startGame} className="btn-primary w-full text-lg">
+                スタート（残り{remaining}回）
+              </button>
+            ) : (
+              <div className="text-center space-y-2">
+                <p className="text-red-400 font-bold text-sm">
+                  本日のプレイ上限（{MAX_PLAYS_PER_DAY}回）に達しました
+                </p>
+                <p className="text-[#64748b] text-xs">明日また挑戦しよう！</p>
+              </div>
+            )}
           </div>
         )}
 

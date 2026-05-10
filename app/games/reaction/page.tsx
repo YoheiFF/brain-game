@@ -6,6 +6,7 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
 type Phase = "ready" | "waiting" | "go" | "tooEarly" | "result";
 
@@ -21,11 +22,13 @@ export default function ReactionGame() {
   const [startTime, setStartTime] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
+  const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [avgTime, setAvgTime] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setBest(getPersonalBest("reaction"));
+    setRemaining(getRemainingPlays("reaction"));
   }, []);
 
   const startRound = useCallback(() => {
@@ -60,6 +63,8 @@ export default function ReactionGame() {
       const avg = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
       setAvgTime(avg);
       const newBest = saveScore("reaction", avg, getNickname() ?? "ゲスト");
+      recordPlay("reaction", avg);
+      setRemaining(getRemainingPlays("reaction"));
       setBest(newBest);
       setIsNewBest(newBest === avg);
       setPhase("result");
@@ -90,7 +95,18 @@ export default function ReactionGame() {
               <p>{ROUNDS}回の平均タイムを計測します</p>
               {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}ms</span> (低いほど良い)</p>}
             </div>
-            <button onClick={startGame} className="btn-primary w-full text-lg">スタート</button>
+            {remaining > 0 ? (
+              <button onClick={startGame} className="btn-primary w-full text-lg">
+                スタート（残り{remaining}回）
+              </button>
+            ) : (
+              <div className="text-center space-y-2">
+                <p className="text-red-400 font-bold text-sm">
+                  本日のプレイ上限（{MAX_PLAYS_PER_DAY}回）に達しました
+                </p>
+                <p className="text-[#64748b] text-xs">明日また挑戦しよう！</p>
+              </div>
+            )}
           </div>
         )}
 

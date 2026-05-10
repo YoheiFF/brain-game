@@ -5,6 +5,7 @@ import { getAllPersonalBests, type GameId } from "@/lib/scores";
 import { getNickname, hasNickname, getAge } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
 import { getBenchmark } from "@/lib/benchmarks";
+import { getAllRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
 const GAMES: {
   id: GameId;
@@ -15,7 +16,7 @@ const GAMES: {
   unit: string;
   lowerIsBetter?: boolean;
 }[] = [
-  { id: "calculation",    title: "計算ゲーム",     description: "60秒間で四則演算を解け！",       icon: "🧮", color: "from-violet-600 to-purple-700", unit: "問" },
+  { id: "calculation",    title: "計算ゲーム",     description: "30秒間で四則演算を解け！",       icon: "🧮", color: "from-violet-600 to-purple-700", unit: "問" },
   { id: "memory-number",  title: "数字記憶",       description: "数列を覚えて正確に入力しよう",   icon: "🔢", color: "from-blue-600 to-cyan-600",     unit: "桁" },
   { id: "stroop",         title: "ストループテスト", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "点" },
   { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "ms", lowerIsBetter: true },
@@ -26,6 +27,7 @@ export default function Home() {
   const [bests, setBests] = useState<Partial<Record<GameId, number>>>({});
   const [nickname, setNickname] = useState<string | null>(null);
   const [age, setAge] = useState<number | null>(null);
+  const [remainingPlays, setRemainingPlays] = useState<Partial<Record<GameId, number>>>({});
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [modalMode, setModalMode] = useState<"setup" | "change">("setup");
   const [mounted, setMounted] = useState(false);
@@ -36,6 +38,7 @@ export default function Home() {
     const nick = getNickname();
     setNickname(nick);
     setAge(getAge());
+    setRemainingPlays(getAllRemainingPlays());
     if (!hasNickname()) {
       setModalMode("setup");
       setShowNicknameModal(true);
@@ -79,6 +82,12 @@ export default function Home() {
             </div>
           )}
           <Link
+            href="/stats"
+            className="flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+          >
+            🧠 統計
+          </Link>
+          <Link
             href="/rankings"
             className="flex items-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
           >
@@ -108,7 +117,6 @@ export default function Home() {
                   <div className="flex items-center gap-1">
                     <span className="text-[#64748b] text-xs">📊 {ageGroup}平均</span>
                     <span className="text-[#94a3b8] font-bold text-sm">{average}{game.unit}</span>
-                    {game.lowerIsBetter && <span className="text-[#64748b] text-xs">(低いほど良い)</span>}
                   </div>
                 );
               })()}
@@ -118,10 +126,24 @@ export default function Home() {
                   <span className="text-[#6c63ff] font-bold text-sm">
                     {bests[game.id]}{game.unit}
                   </span>
+                  {game.lowerIsBetter && <span className="text-[#64748b] text-xs">(低いほど良い)</span>}
                 </div>
               ) : (
                 <span className="text-[#64748b] text-xs">まだプレイ履歴なし</span>
               )}
+              {(() => {
+                const remaining = remainingPlays[game.id] ?? MAX_PLAYS_PER_DAY
+                return (
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className={`text-xs font-bold ${
+                      remaining === 0 ? "text-red-400" :
+                      remaining === 1 ? "text-yellow-400" : "text-green-400"
+                    }`}>
+                      {remaining === 0 ? "本日上限" : `残り${remaining}回`}
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
           </Link>
         ))}
