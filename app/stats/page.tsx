@@ -6,9 +6,11 @@ import { getAge } from "@/lib/nickname"
 import { calcBrainAge } from "@/lib/brain-age"
 import { getRadarData, getBrainType, type CognitiveSkill } from "@/lib/brain-type"
 import { getAllTitles } from "@/lib/titles"
-import { getDailyHistory } from "@/lib/daily"
+import { getDailyHistory, getDailyBests } from "@/lib/daily"
 import RadarChart from "@/components/RadarChart"
 import MiniBarChart from "@/components/MiniBarChart"
+
+type Tab = "today" | "alltime"
 
 const RARITY_COLOR = {
   normal: "border-[#2a2a4a] text-[#64748b]",
@@ -18,25 +20,30 @@ const RARITY_COLOR = {
 
 export default function StatsPage() {
   const [bests, setBests] = useState<Partial<Record<GameId, number>>>({})
+  const [dailyBests, setDailyBests] = useState<Partial<Record<GameId, number>>>({})
   const [age, setAge] = useState<number | null>(null)
   const [totalPlays, setTotalPlays] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [tab, setTab] = useState<Tab>("today")
 
   useEffect(() => {
     setMounted(true)
     setBests(getAllPersonalBests())
+    setDailyBests(getDailyBests())
     setAge(getAge())
     setTotalPlays(getTotalPlayCount())
   }, [])
 
   if (!mounted) return null
 
-  const brainAge = calcBrainAge(bests)
-  const radarData = getRadarData(bests)
+  const currentBests = tab === "today" ? dailyBests : bests
+  const brainAge = calcBrainAge(currentBests)
+  const radarData = getRadarData(currentBests)
   const brainType = getBrainType(radarData)
   const titles = getAllTitles(bests, totalPlays)
   const history = getDailyHistory(14)
   const hasData = Object.keys(bests).length > 0
+  const hasTodayData = Object.keys(dailyBests).length > 0
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8 min-h-screen">
@@ -55,10 +62,36 @@ export default function StatsPage() {
       ) : (
         <div className="space-y-6">
 
+          {/* タブ切り替え */}
+          <div className="flex rounded-xl bg-[#1a1a2e] border border-[#2a2a4a] p-1 gap-1">
+            <button
+              onClick={() => setTab("today")}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                tab === "today"
+                  ? "bg-[#6c63ff] text-white shadow-lg"
+                  : "text-[#64748b] hover:text-white"
+              }`}
+            >
+              今日
+            </button>
+            <button
+              onClick={() => setTab("alltime")}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                tab === "alltime"
+                  ? "bg-[#6c63ff] text-white shadow-lg"
+                  : "text-[#64748b] hover:text-white"
+              }`}
+            >
+              累計ベスト
+            </button>
+          </div>
+
           {/* 脳年齢 */}
           <section className="card p-6">
             <h2 className="text-lg font-bold text-white mb-4">🧬 脳年齢診断</h2>
-            {brainAge !== null ? (
+            {tab === "today" && !hasTodayData ? (
+              <p className="text-[#64748b] text-sm">今日はまだプレイしていません</p>
+            ) : brainAge !== null ? (
               <div className="flex items-end gap-3">
                 <span className="text-6xl font-black text-[#6c63ff]">{brainAge}</span>
                 <span className="text-[#64748b] text-lg mb-1">歳</span>
@@ -84,13 +117,19 @@ export default function StatsPage() {
           {/* レーダーチャート + 脳タイプ */}
           <section className="card p-6">
             <h2 className="text-lg font-bold text-white mb-1">📊 認知能力マップ</h2>
-            <p className="text-[#6c63ff] font-bold text-sm mb-4">タイプ: {brainType}</p>
-            <div className="flex justify-center">
-              <RadarChart data={radarData as Record<CognitiveSkill, number | null>} size={240} />
-            </div>
-            <p className="text-[#3a3a6a] text-xs mt-2 text-center">
-              ※ 20代平均スコアを50として換算
-            </p>
+            {tab === "today" && !hasTodayData ? (
+              <p className="text-[#64748b] text-sm">今日はまだプレイしていません</p>
+            ) : (
+              <>
+                <p className="text-[#6c63ff] font-bold text-sm mb-4">タイプ: {brainType}</p>
+                <div className="flex justify-center">
+                  <RadarChart data={radarData as Record<CognitiveSkill, number | null>} size={240} />
+                </div>
+                <p className="text-[#3a3a6a] text-xs mt-2 text-center">
+                  ※ 20代平均スコアを50として換算
+                </p>
+              </>
+            )}
           </section>
 
           {/* 称号 */}

@@ -1,4 +1,6 @@
 "use client";
+import { calcGamePoints } from "@/lib/game-points";
+import type { GameId } from "@/lib/scores";
 
 interface BenchmarkInfo {
   ageGroup: string;
@@ -16,14 +18,16 @@ interface Props {
   onHome: () => void;
   lowerIsBetter?: boolean;
   benchmark?: BenchmarkInfo;
+  gameId?: GameId;
 }
 
-export default function ResultModal({ score, best, unit = "点", isNewBest, onRetry, onHome, lowerIsBetter, benchmark }: Props) {
+export default function ResultModal({ score, best, unit = "点", isNewBest, onRetry, onHome, lowerIsBetter, benchmark, gameId }: Props) {
+  const points = gameId !== undefined ? calcGamePoints(gameId, score) : undefined;
   const getBenchmarkLabel = (b: BenchmarkInfo) => {
     const better = b.lowerIsBetter ? score < b.average : score > b.average;
     const equal = score === b.average;
     if (equal) return { text: "平均と同じ", color: "text-yellow-400" };
-    if (better) return { text: `平均より${b.lowerIsBetter ? score - b.average : score - b.average > 0 ? "+" : ""}${Math.abs(score - b.average)}${b.unit}上`, color: "text-green-400" };
+    if (better) return { text: `平均より${!b.lowerIsBetter ? "+" : ""}${Math.abs(score - b.average)}${b.unit}上`, color: "text-green-400" };
     return { text: `平均より${Math.abs(score - b.average)}${b.unit}下`, color: "text-orange-400" };
   };
 
@@ -42,6 +46,21 @@ export default function ResultModal({ score, best, unit = "点", isNewBest, onRe
             <span className="text-xl text-[#64748b] ml-1">{unit}</span>
           </p>
         </div>
+        {points !== undefined && (
+          <div className="flex items-center justify-center gap-2">
+            <div className={`flex items-center gap-1.5 border rounded-xl px-5 py-2 ${
+              points >= 15 ? "bg-green-500/10 border-green-500/30" :
+              points >= 8  ? "bg-[#6c63ff]/10 border-[#6c63ff]/30" :
+                             "bg-orange-500/10 border-orange-500/30"
+            }`}>
+              <span className={`text-3xl font-black ${
+                points >= 15 ? "text-green-400" :
+                points >= 8  ? "text-[#6c63ff]" : "text-orange-400"
+              }`}>{points}</span>
+              <span className="text-[#64748b] text-sm">/ 20点</span>
+            </div>
+          </div>
+        )}
         {best !== null && (
           <div className="text-center">
             <p className="text-[#64748b] text-xs mb-1">ベスト</p>

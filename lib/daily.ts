@@ -81,6 +81,10 @@ export function recordPlay(gameId: GameId, score: number): void {
   updateDailyHistory(record)
 }
 
+export function getDailyBests(): Partial<Record<GameId, number>> {
+  return loadDaily().bestScores
+}
+
 export function getAllRemainingPlays(): Partial<Record<GameId, number>> {
   const result: Partial<Record<GameId, number>> = {}
   for (const id of GAME_IDS) result[id] = getRemainingPlays(id)

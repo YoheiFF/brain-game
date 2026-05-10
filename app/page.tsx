@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAllPersonalBests, type GameId } from "@/lib/scores";
+import { calcGamePoints, calcTotalPoints } from "@/lib/game-points";
 import { getNickname, hasNickname, getAge } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
 import { getBenchmark } from "@/lib/benchmarks";
@@ -96,6 +97,29 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 合計ポイント */}
+      {Object.keys(bests).length > 0 && (() => {
+        const total = calcTotalPoints(bests)
+        const pct = Math.round((total / 100) * 100)
+        return (
+          <div className="card p-4 mb-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[#64748b] text-sm font-bold">🎯 総合ポイント</span>
+              <span className="text-white font-black text-lg">
+                {total}
+                <span className="text-[#64748b] text-sm font-normal"> / 100点</span>
+              </span>
+            </div>
+            <div className="w-full bg-[#0f0f1a] rounded-full h-2">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-[#6c63ff] to-purple-400 transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ゲームカード */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {GAMES.map((game, i) => (
@@ -121,12 +145,26 @@ export default function Home() {
                 );
               })()}
               {bests[game.id] !== undefined ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-yellow-400 text-xs">🏆 ベスト</span>
-                  <span className="text-[#6c63ff] font-bold text-sm">
-                    {bests[game.id]}{game.unit}
-                  </span>
-                  {game.lowerIsBetter && <span className="text-[#64748b] text-xs">(低いほど良い)</span>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="text-yellow-400 text-xs">🏆 ベスト</span>
+                    <span className="text-[#6c63ff] font-bold text-sm">
+                      {bests[game.id]}{game.unit}
+                    </span>
+                    {game.lowerIsBetter && <span className="text-[#64748b] text-xs">(低いほど良い)</span>}
+                  </div>
+                  {(() => {
+                    const pts = calcGamePoints(game.id, bests[game.id]!)
+                    return (
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${
+                        pts >= 15 ? "bg-green-500/15 text-green-400" :
+                        pts >= 8  ? "bg-[#6c63ff]/15 text-[#6c63ff]" :
+                                    "bg-orange-500/15 text-orange-400"
+                      }`}>
+                        {pts}点
+                      </span>
+                    )
+                  })()}
                 </div>
               ) : (
                 <span className="text-[#64748b] text-xs">まだプレイ履歴なし</span>

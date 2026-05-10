@@ -198,6 +198,7 @@ export default function CalculationGame() {
             onRetry={startGame}
             onHome={() => router.push("/")}
             benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("calculation", age); return { ...b, unit: "問" }; })()}
+            gameId="calculation"
           />
         )}
       </div>

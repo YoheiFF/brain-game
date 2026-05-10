@@ -273,6 +273,7 @@ export default function MemoryNumberGame() {
             onRetry={startGame}
             onHome={() => router.push("/")}
             benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("memory-number", age); return { ...b, unit: "桁" }; })()}
+            gameId="memory-number"
           />
         )}
       </div>

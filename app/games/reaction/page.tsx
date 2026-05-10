@@ -165,6 +165,7 @@ export default function ReactionGame() {
             onHome={() => router.push("/")}
             lowerIsBetter
             benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("reaction", age); return { ...b, unit: "ms", lowerIsBetter: true }; })()}
+            gameId="reaction"
           />
         )}
       </div>

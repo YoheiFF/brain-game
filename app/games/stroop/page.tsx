@@ -204,6 +204,7 @@ export default function StroopGame() {
             onRetry={startGame}
             onHome={() => router.push("/")}
             benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("stroop", age); return { ...b, unit: "点" }; })()}
+            gameId="stroop"
           />
         )}
       </div>

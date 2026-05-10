@@ -208,6 +208,7 @@ export default function PatternGame() {
             onRetry={startGame}
             onHome={() => router.push("/")}
             benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("pattern", age); return { ...b, unit: "点" }; })()}
+            gameId="pattern"
           />
         )}
       </div>
