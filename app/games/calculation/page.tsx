@@ -164,7 +164,7 @@ export default function CalculationGame() {
               {question.a} {question.op} {question.b} = ?
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="w-full">
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="w-full flex flex-col gap-3">
               <input
                 ref={inputRef}
                 type="text"
@@ -178,6 +178,13 @@ export default function CalculationGame() {
                 placeholder="答えを入力"
                 autoComplete="off"
               />
+              <button
+                type="submit"
+                disabled={input.trim() === ""}
+                className="btn-primary w-full text-xl py-4 disabled:opacity-40"
+              >
+                決定
+              </button>
             </form>
           </div>
         )}
