@@ -31,31 +31,14 @@ export default function RankingsPage() {
   const { data: syncData, loading } = useDbSync({ interval: 30000 });
 
   useEffect(() => {
-    const nick = getNickname();
-    setMyNick(nick);
-    // 初期値は localStorage から（DB データが届くまでのフォールバック）
-    const gr: Partial<Record<GameId, RankEntry[]>> = {};
-    for (const id of GAME_IDS) gr[id] = getGameRanking(id);
-    setGameRankings(gr);
-    setOverall(getOverallRanking());
-    // 自分の順位（全件検索）
-    if (nick) {
-      const myGame: Partial<Record<GameId, RankEntry>> = {};
-      for (const id of GAME_IDS) {
-        const e = getUserGameRankEntry(id, nick);
-        if (e) myGame[id] = e;
-      }
-      setMyGameEntries(myGame);
-      setMyOverallEntry(getUserOverallRankEntry(nick));
-    }
+    setMyNick(getNickname());
   }, []);
 
-  // DB データで上書き
+  // DB データで描画（初回もDB取得後のみ表示）
   useEffect(() => {
     if (!syncData) return;
     setGameRankings(syncData.gameRankings);
     setOverall(syncData.overallRanking);
-    // DB から返ってきた自分の順位で上書き
     setMyGameEntries(syncData.myGameRanks);
     setMyOverallEntry(syncData.myOverallRank);
   }, [syncData]);
@@ -92,14 +75,16 @@ export default function RankingsPage() {
         ))}
       </div>
 
+      {/* ローディング中はスケルトン表示 */}
+      {loading && !syncData && <RankingSkeleton />}
+
       {/* 総合ランキング */}
-      {tab === "overall" && (
+      {!loading && syncData && tab === "overall" && (
         <div className="animate-fade-in">
           <p className="text-[#64748b] text-xs mb-4">
             各種目のスコアを20代平均基準で換算した合計点順（最大100点）
           </p>
 
-          {/* 自分の順位カード */}
           {myOverallEntry && (
             <div className="mb-4">
               <p className="text-xs text-[#64748b] mb-2">あなたの順位</p>
@@ -121,11 +106,11 @@ export default function RankingsPage() {
       )}
 
       {/* 種目別ランキング */}
-      {tab !== "overall" && (
+      {!loading && syncData && tab !== "overall" && (
         <div className="animate-fade-in">
           {(() => {
             const gameId = tab as GameId;
-            const { label, unit, lowerIsBetter } = GAME_META[gameId];
+            const { unit, lowerIsBetter } = GAME_META[gameId];
             const list = gameRankings[gameId] ?? [];
             return (
               <>
@@ -135,7 +120,6 @@ export default function RankingsPage() {
                   </p>
                 </div>
 
-                {/* 自分の順位カード */}
                 {myGameEntries[gameId] && (
                   <div className="mb-4">
                     <p className="text-xs text-[#64748b] mb-2">あなたの順位</p>
@@ -230,6 +214,26 @@ function GameCard({
           <span className="text-xs text-[#64748b] ml-0.5">pt</span>
         </p>
       </div>
+    </div>
+  );
+}
+
+function RankingSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="card p-4 flex items-center gap-4">
+          <div className="w-10 h-8 bg-[#2a2a4a] rounded" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-[#2a2a4a] rounded w-24" />
+            <div className="h-3 bg-[#2a2a4a] rounded w-40" />
+          </div>
+          <div className="space-y-2 text-right">
+            <div className="h-6 bg-[#2a2a4a] rounded w-12" />
+            <div className="h-3 bg-[#2a2a4a] rounded w-8 ml-auto" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
