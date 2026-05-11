@@ -6,7 +6,8 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
-import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining, recordRewardedPlay } from "@/lib/daily";
+import WatchAdButton from "@/components/WatchAdButton";
 
 type Phase = "ready" | "waiting" | "go" | "tooEarly" | "result";
 
@@ -23,12 +24,14 @@ export default function ReactionGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
+  const [rewardedRemaining, setRewardedRemaining] = useState(0);
   const [avgTime, setAvgTime] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setBest(getPersonalBest("reaction"));
     setRemaining(getRemainingPlays("reaction"));
+    setRewardedRemaining(getRewardedRemaining("reaction"));
   }, []);
 
   const startRound = useCallback(() => {
@@ -100,12 +103,14 @@ export default function ReactionGame() {
                 スタート（残り{remaining}回）
               </button>
             ) : (
-              <div className="text-center space-y-2">
-                <p className="text-red-400 font-bold text-sm">
-                  本日のプレイ上限（{MAX_PLAYS_PER_DAY}回）に達しました
-                </p>
-                <p className="text-[#64748b] text-xs">明日また挑戦しよう！</p>
-              </div>
+              <WatchAdButton
+                gameId="reaction"
+                rewardedRemaining={rewardedRemaining}
+                onRewarded={() => {
+                  setRemaining(getRemainingPlays("reaction"));
+                  setRewardedRemaining(getRewardedRemaining("reaction"));
+                }}
+              />
             )}
           </div>
         )}

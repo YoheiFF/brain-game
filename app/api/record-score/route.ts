@@ -19,7 +19,7 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   pattern:         { min: 0,  max: 25   },
 };
 
-const MAX_PLAYS_PER_DAY = 3;
+const MAX_PLAYS_PER_DAY = 6; // 3 base + 3 rewarded
 
 // ── CORS（/api/sync/route.ts と同一パターン） ────────────────────
 const ALLOWED_ORIGINS = [

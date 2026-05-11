@@ -6,7 +6,8 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
-import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining, recordRewardedPlay } from "@/lib/daily";
+import WatchAdButton from "@/components/WatchAdButton";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -57,6 +58,7 @@ export default function CalculationGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
+  const [rewardedRemaining, setRewardedRemaining] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +85,7 @@ export default function CalculationGame() {
   useEffect(() => {
     setBest(getPersonalBest("calculation"));
     setRemaining(getRemainingPlays("calculation"));
+    setRewardedRemaining(getRewardedRemaining("calculation"));
   }, []);
 
   useEffect(() => {
@@ -137,12 +140,14 @@ export default function CalculationGame() {
                 スタート（残り{remaining}回）
               </button>
             ) : (
-              <div className="text-center space-y-2">
-                <p className="text-red-400 font-bold text-sm">
-                  本日のプレイ上限（{MAX_PLAYS_PER_DAY}回）に達しました
-                </p>
-                <p className="text-[#64748b] text-xs">明日また挑戦しよう！</p>
-              </div>
+              <WatchAdButton
+                gameId="calculation"
+                rewardedRemaining={rewardedRemaining}
+                onRewarded={() => {
+                  setRemaining(getRemainingPlays("calculation"));
+                  setRewardedRemaining(getRewardedRemaining("calculation"));
+                }}
+              />
             )}
           </div>
         )}
