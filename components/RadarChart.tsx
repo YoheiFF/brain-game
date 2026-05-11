@@ -9,6 +9,7 @@ interface Props {
 const SKILLS: CognitiveSkill[] = ["計算力", "記憶力", "集中力", "反応速度", "空間認識"]
 
 export default function RadarChart({ data, size = 220 }: Props) {
+  const pad = 36
   const cx = size / 2
   const cy = size / 2
   const r = size * 0.38
@@ -42,7 +43,7 @@ export default function RadarChart({ data, size = 220 }: Props) {
   }
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg width={size} height={size} viewBox={`${-pad} ${-pad} ${size + pad * 2} ${size + pad * 2}`}>
       {gridLevels.map((level) => (
         <polygon
           key={level}
