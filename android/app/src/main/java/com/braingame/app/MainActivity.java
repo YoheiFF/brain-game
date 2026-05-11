@@ -5,6 +5,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
@@ -15,8 +16,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WebView webView = getBridge().getWebView();
+        webView.addJavascriptInterface(new NetworkBridge(webView), "AndroidBridge");
         if (!isNetworkAvailable()) {
-            showOfflinePage();
+            showOfflinePage(webView);
         }
     }
 
@@ -29,8 +32,14 @@ public class MainActivity extends BridgeActivity {
         return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     }
 
-    private void showOfflinePage() {
-        WebView webView = getBridge().getWebView();
+    private void showOfflinePage(WebView webView) {
+        showOfflinePage(webView, false);
+    }
+
+    private void showOfflinePage(WebView webView, boolean stillOffline) {
+        String notice = stillOffline
+            ? "<p class='notice'>まだ接続されていません。<br>しばらくしてから再試行してください。</p>"
+            : "";
         String html =
             "<!DOCTYPE html><html><head>" +
             "<meta charset='UTF-8'>" +
@@ -43,6 +52,7 @@ public class MainActivity extends BridgeActivity {
             ".icon { font-size: 72px; margin-bottom: 28px; }" +
             "h1 { font-size: 22px; font-weight: 900; margin-bottom: 14px; }" +
             "p { color: #64748b; font-size: 15px; line-height: 1.7; margin-bottom: 36px; }" +
+            ".notice { color: #f87171; font-size: 14px; margin-top: -20px; margin-bottom: 24px; }" +
             "button { background: #6c63ff; color: #fff; border: none; border-radius: 14px;" +
             "  padding: 16px 40px; font-size: 17px; font-weight: 700; cursor: pointer;" +
             "  -webkit-tap-highlight-color: transparent; }" +
@@ -52,8 +62,28 @@ public class MainActivity extends BridgeActivity {
             "<h1>インターネット未接続</h1>" +
             "<p>BrainGame はオンライン接続が必要です。<br>" +
             "Wi-Fi またはモバイルデータをオンにしてから<br>再試行してください。</p>" +
-            "<button onclick=\"window.location.href='" + SERVER_URL + "'\">再試行</button>" +
+            notice +
+            "<button onclick='AndroidBridge.retry()'>再試行</button>" +
             "</body></html>";
         webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+    }
+
+    private class NetworkBridge {
+        private final WebView webView;
+
+        NetworkBridge(WebView webView) {
+            this.webView = webView;
+        }
+
+        @JavascriptInterface
+        public void retry() {
+            runOnUiThread(() -> {
+                if (isNetworkAvailable()) {
+                    webView.loadUrl(SERVER_URL);
+                } else {
+                    showOfflinePage(webView, true);
+                }
+            });
+        }
     }
 }
