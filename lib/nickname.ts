@@ -1,5 +1,6 @@
 const KEY = "braingame_nickname";
 const KEY_AGE = "braingame_age";
+const KEY_USER_ID = "braingame_user_id";
 
 export function getNickname(): string | null {
   if (typeof window === "undefined") return null;
@@ -22,4 +23,21 @@ export function getAge(): number | null {
 
 export function setAge(age: number) {
   localStorage.setItem(KEY_AGE, String(age));
+}
+
+export function getUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(KEY_USER_ID);
+}
+
+export function setUserId(id: string): void {
+  localStorage.setItem(KEY_USER_ID, id);
+}
+
+export function getOrInitUserId(): string {
+  const existing = getUserId();
+  if (existing) return existing;
+  const newId = crypto.randomUUID();
+  setUserId(newId);
+  return newId;
 }

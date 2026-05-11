@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname, getAge } from "@/lib/nickname";
+import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
@@ -62,7 +62,7 @@ export default function ReactionGame() {
     if (round >= ROUNDS) {
       const avg = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
       setAvgTime(avg);
-      const newBest = saveScore("reaction", avg, getNickname() ?? "ゲスト");
+      const newBest = saveScore("reaction", avg, getNickname() ?? "ゲスト", getOrInitUserId());
       recordPlay("reaction", avg);
       setRemaining(getRemainingPlays("reaction"));
       setBest(newBest);

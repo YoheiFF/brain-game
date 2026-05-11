@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getAllPersonalBests, type GameId } from "@/lib/scores";
+import { getAllPersonalBests, type GameId, GAME_IDS } from "@/lib/scores";
 import { calcGamePoints, calcTotalPoints } from "@/lib/game-points";
 import { getNickname, hasNickname, getAge } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
 import { getBenchmark } from "@/lib/benchmarks";
 import { getAllRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
+import { useDbSync } from "@/hooks/useDbSync";
 
 const GAMES: {
   id: GameId;
@@ -19,9 +20,9 @@ const GAMES: {
 }[] = [
   { id: "calculation",    title: "計算ゲーム",     description: "30秒間で四則演算を解け！",       icon: "🧮", color: "from-violet-600 to-purple-700", unit: "問" },
   { id: "memory-number",  title: "数字記憶",       description: "数列を覚えて正確に入力しよう",   icon: "🔢", color: "from-blue-600 to-cyan-600",     unit: "桁" },
-  { id: "stroop",         title: "ストループ", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "点" },
+  { id: "stroop",         title: "ストループ", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "個" },
   { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "ms", lowerIsBetter: true },
-  { id: "pattern",        title: "図形記憶",       description: "光ったマスのパターンを記憶せよ", icon: "🧩", color: "from-green-600 to-teal-600",    unit: "点" },
+  { id: "pattern",        title: "図形記憶",       description: "光ったマスのパターンを記憶せよ", icon: "🧩", color: "from-green-600 to-teal-600",    unit: "個" },
 ];
 
 export default function Home() {
@@ -32,6 +33,9 @@ export default function Home() {
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [modalMode, setModalMode] = useState<"setup" | "change">("setup");
   const [mounted, setMounted] = useState(false);
+
+  // ホームはポーリングなし（初回フェッチのみ）
+  const { data: syncData, loading: syncLoading } = useDbSync({ interval: null });
 
   useEffect(() => {
     setMounted(true);
@@ -45,6 +49,19 @@ export default function Home() {
       setShowNicknameModal(true);
     }
   }, []);
+
+  // syncData が届いたら DB データで上書き
+  useEffect(() => {
+    if (!syncData) return;
+    setBests(syncData.personalBests);
+    // dailyPlays を remainingPlays に変換
+    const remaining: Partial<Record<GameId, number>> = {};
+    for (const id of GAME_IDS) {
+      const play = syncData.dailyPlays[id];
+      remaining[id] = Math.max(0, MAX_PLAYS_PER_DAY - (play?.playCount ?? 0));
+    }
+    setRemainingPlays(remaining);
+  }, [syncData]);
 
   const handleNicknameClose = (nick: string) => {
     setNickname(nick);
@@ -188,7 +205,7 @@ export default function Home() {
       </div>
 
       <p className="text-center text-[#2a2a4a] text-xs mt-10">
-        スコアはこのデバイスに保存されます
+        {syncLoading ? "サーバーと同期中..." : "スコアはクラウドに保存されます"}
       </p>
     </main>
   );

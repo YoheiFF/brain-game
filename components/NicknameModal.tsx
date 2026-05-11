@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { getNickname, setNickname, getAge, setAge } from "@/lib/nickname";
+import { getNickname, setNickname, getAge, setAge, getOrInitUserId } from "@/lib/nickname";
+import { upsertUser } from "@/app/actions/user";
 
 interface Props {
   onClose: (nickname: string) => void;
@@ -22,16 +23,31 @@ export default function NicknameModal({ onClose, mode = "setup" }: Props) {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [mode]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmed = value.trim();
     if (trimmed.length === 0) { setError("ニックネームを入力してください"); return; }
     if (trimmed.length > 12) { setError("12文字以内で入力してください"); return; }
+
+    let ageNum: number | null = null;
     if (ageValue !== "") {
       const age = parseInt(ageValue, 10);
       if (isNaN(age) || age < 1 || age > 120) { setError("年齢は1〜120で入力してください"); return; }
+      ageNum = age;
       setAge(age);
     }
+
+    // localStorage に保存
     setNickname(trimmed);
+
+    // UUID の取得または生成
+    const userId = getOrInitUserId();
+
+    // Server Action を非同期で呼ぶ（fire-and-forget）
+    upsertUser({ id: userId, nickname: trimmed, age: ageNum }).catch((e) => {
+      console.warn("[NicknameModal] upsertUser 失敗:", e);
+    });
+
+    // モーダルを閉じる
     onClose(trimmed);
   };
 

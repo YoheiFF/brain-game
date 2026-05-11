@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname, getAge } from "@/lib/nickname";
+import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
@@ -63,7 +63,7 @@ export default function CalculationGame() {
   const endGame = useCallback((currentScore: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
     setFinalScore(currentScore);
-    const newBest = saveScore("calculation", currentScore, getNickname() ?? "ゲスト");
+    const newBest = saveScore("calculation", currentScore, getNickname() ?? "ゲスト", getOrInitUserId());
     recordPlay("calculation", currentScore);
     setRemaining(getRemainingPlays("calculation"));
     setBest(newBest);

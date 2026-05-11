@@ -4,9 +4,12 @@ import Link from "next/link";
 import {
   GAME_IDS, GAME_META, GameId,
   getGameRanking, getOverallRanking,
+  getUserGameRankEntry, getUserOverallRankEntry,
   type RankEntry, type OverallEntry,
 } from "@/lib/scores";
+import { calcGamePoints } from "@/lib/game-points";
 import { getNickname } from "@/lib/nickname";
+import { useDbSync } from "@/hooks/useDbSync";
 
 type Tab = GameId | "overall";
 
@@ -21,14 +24,41 @@ export default function RankingsPage() {
   const [gameRankings, setGameRankings] = useState<Partial<Record<GameId, RankEntry[]>>>({});
   const [overall, setOverall] = useState<OverallEntry[]>([]);
   const [myNick, setMyNick] = useState<string | null>(null);
+  const [myGameEntries, setMyGameEntries] = useState<Partial<Record<GameId, RankEntry>>>({});
+  const [myOverallEntry, setMyOverallEntry] = useState<OverallEntry | null>(null);
+
+  // 30秒ポーリング（ランキング画面のみ有効）
+  const { data: syncData, loading } = useDbSync({ interval: 30000 });
 
   useEffect(() => {
-    setMyNick(getNickname());
+    const nick = getNickname();
+    setMyNick(nick);
+    // 初期値は localStorage から（DB データが届くまでのフォールバック）
     const gr: Partial<Record<GameId, RankEntry[]>> = {};
     for (const id of GAME_IDS) gr[id] = getGameRanking(id);
     setGameRankings(gr);
     setOverall(getOverallRanking());
+    // 自分の順位（全件検索）
+    if (nick) {
+      const myGame: Partial<Record<GameId, RankEntry>> = {};
+      for (const id of GAME_IDS) {
+        const e = getUserGameRankEntry(id, nick);
+        if (e) myGame[id] = e;
+      }
+      setMyGameEntries(myGame);
+      setMyOverallEntry(getUserOverallRankEntry(nick));
+    }
   }, []);
+
+  // DB データで上書き
+  useEffect(() => {
+    if (!syncData) return;
+    setGameRankings(syncData.gameRankings);
+    setOverall(syncData.overallRanking);
+    // DB から返ってきた自分の順位で上書き
+    setMyGameEntries(syncData.myGameRanks);
+    setMyOverallEntry(syncData.myOverallRank);
+  }, [syncData]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "overall", label: "🏆 総合" },
@@ -40,6 +70,9 @@ export default function RankingsPage() {
       <div className="flex items-center gap-3 mb-6">
         <Link href="/" className="text-sm text-[#6c63ff] hover:underline">← ホーム</Link>
         <h1 className="text-3xl font-black text-white">ランキング</h1>
+        {loading && (
+          <span className="text-xs text-[#64748b] animate-pulse">同期中...</span>
+        )}
       </div>
 
       {/* タブ */}
@@ -65,44 +98,22 @@ export default function RankingsPage() {
           <p className="text-[#64748b] text-xs mb-4">
             各種目のスコアを20代平均基準で換算した合計点順（最大100点）
           </p>
+
+          {/* 自分の順位カード */}
+          {myOverallEntry && (
+            <div className="mb-4">
+              <p className="text-xs text-[#64748b] mb-2">あなたの順位</p>
+              <OverallCard e={myOverallEntry} myNick={myNick} isMe />
+              <div className="border-t border-[#2a2a4a] mt-4 mb-3" />
+            </div>
+          )}
+
           {overall.length === 0 ? (
             <EmptyState />
           ) : (
             <div className="space-y-3">
               {overall.map((e) => (
-                <div
-                  key={e.nickname}
-                  className={`card p-4 flex items-center gap-4 transition-all ${
-                    e.nickname === myNick ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
-                  }`}
-                >
-                  <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
-                    {medal(e.rank)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white truncate">{e.nickname}</span>
-                      {e.nickname === myNick && (
-                        <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
-                      )}
-                    </div>
-                    <div className="flex gap-3 mt-1 flex-wrap">
-                      {GAME_IDS.map((gid) =>
-                        e.details[gid] !== undefined ? (
-                          <span key={gid} className="text-xs text-[#64748b]">
-                            {GAME_META[gid].label.replace("テスト", "").replace("ゲーム", "")}:{" "}
-                            <span className="text-white">{e.details[gid]}{GAME_META[gid].unit}</span>
-                          </span>
-                        ) : null
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
-                    <p className="text-[#64748b] text-xs">/ 100点</p>
-                    <p className="text-[#64748b] text-xs mt-0.5">{e.gamesPlayed}/5種目</p>
-                  </div>
-                </div>
+                <OverallCard key={e.nickname} e={e} myNick={myNick} />
               ))}
             </div>
           )}
@@ -123,38 +134,22 @@ export default function RankingsPage() {
                     {lowerIsBetter ? "低いスコアほど上位" : "高いスコアほど上位"}
                   </p>
                 </div>
+
+                {/* 自分の順位カード */}
+                {myGameEntries[gameId] && (
+                  <div className="mb-4">
+                    <p className="text-xs text-[#64748b] mb-2">あなたの順位</p>
+                    <GameCard e={myGameEntries[gameId]!} myNick={myNick} unit={unit} gameId={gameId} isMe />
+                    <div className="border-t border-[#2a2a4a] mt-4 mb-3" />
+                  </div>
+                )}
+
                 {list.length === 0 ? (
                   <EmptyState />
                 ) : (
                   <div className="space-y-3">
                     {list.map((e) => (
-                      <div
-                        key={`${e.nickname}-${e.rank}`}
-                        className={`card p-4 flex items-center gap-4 transition-all ${
-                          e.nickname === myNick ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
-                        }`}
-                      >
-                        <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
-                          {medal(e.rank)}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white truncate">{e.nickname}</span>
-                            {e.nickname === myNick && (
-                              <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
-                            )}
-                          </div>
-                          <p className="text-[#64748b] text-xs mt-0.5">
-                            {new Date(e.date).toLocaleDateString("ja-JP")}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-black text-white">
-                            {e.score}
-                            <span className="text-sm text-[#64748b] ml-1">{unit}</span>
-                          </p>
-                        </div>
-                      </div>
+                      <GameCard key={`${e.nickname}-${e.rank}`} e={e} myNick={myNick} unit={unit} gameId={gameId} />
                     ))}
                   </div>
                 )}
@@ -164,6 +159,78 @@ export default function RankingsPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function OverallCard({ e, myNick, isMe = false }: { e: OverallEntry; myNick: string | null; isMe?: boolean }) {
+  return (
+    <div className={`card p-4 flex items-center gap-4 transition-all ${
+      isMe || e.nickname === myNick ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
+    }`}>
+      <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
+        {medal(e.rank)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-white truncate">{e.nickname}</span>
+          {(isMe || e.nickname === myNick) && (
+            <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
+          )}
+        </div>
+        <div className="flex gap-3 mt-1 flex-wrap">
+          {GAME_IDS.map((gid) =>
+            e.details[gid] !== undefined ? (
+              <span key={gid} className="text-xs text-[#64748b]">
+                {GAME_META[gid].label.replace("テスト", "").replace("ゲーム", "")}:{" "}
+                <span className="text-white">{e.details[gid]}{GAME_META[gid].unit}</span>
+              </span>
+            ) : null
+          )}
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
+        <p className="text-[#64748b] text-xs">/ 100点</p>
+        <p className="text-[#64748b] text-xs mt-0.5">{e.gamesPlayed}/5種目</p>
+      </div>
+    </div>
+  );
+}
+
+function GameCard({
+  e, myNick, unit, gameId, isMe = false,
+}: {
+  e: RankEntry; myNick: string | null; unit: string; gameId: GameId; isMe?: boolean;
+}) {
+  return (
+    <div className={`card p-4 flex items-center gap-4 transition-all ${
+      isMe || e.nickname === myNick ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
+    }`}>
+      <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
+        {medal(e.rank)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-white truncate">{e.nickname}</span>
+          {(isMe || e.nickname === myNick) && (
+            <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
+          )}
+        </div>
+        <p className="text-[#64748b] text-xs mt-0.5">
+          {new Date(e.date).toLocaleDateString("ja-JP")}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="text-2xl font-black text-white">
+          {e.score}
+          <span className="text-sm text-[#64748b] ml-1">{unit}</span>
+        </p>
+        <p className="text-[#6c63ff] text-sm font-bold">
+          {calcGamePoints(gameId, e.score)}
+          <span className="text-xs text-[#64748b] ml-0.5">pt</span>
+        </p>
+      </div>
+    </div>
   );
 }
 

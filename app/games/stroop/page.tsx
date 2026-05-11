@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname, getAge } from "@/lib/nickname";
+import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
@@ -68,7 +68,7 @@ export default function StroopGame() {
     if (timerRef.current) clearInterval(timerRef.current);
     const s = scoreRef.current;
     setFinalScore(s);
-    const newBest = saveScore("stroop", s, getNickname() ?? "ゲスト");
+    const newBest = saveScore("stroop", s, getNickname() ?? "ゲスト", getOrInitUserId());
     recordPlay("stroop", s);
     setRemaining(getRemainingPlays("stroop"));
     setBest(newBest);
@@ -199,11 +199,11 @@ export default function StroopGame() {
           <ResultModal
             score={finalScore}
             best={best}
-            unit="点"
+            unit="個"
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
-            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("stroop", age); return { ...b, unit: "点" }; })()}
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("stroop", age); return { ...b, unit: "個" }; })()}
             gameId="stroop"
           />
         )}

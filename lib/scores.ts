@@ -3,9 +3,9 @@ export type GameId = "calculation" | "memory-number" | "stroop" | "reaction" | "
 export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBetter?: boolean }> = {
   calculation:   { label: "計算ゲーム",     unit: "問" },
   "memory-number": { label: "数字記憶",     unit: "桁" },
-  stroop:        { label: "ストループテスト", unit: "点" },
+  stroop:        { label: "ストループテスト", unit: "個" },
   reaction:      { label: "反応速度テスト",  unit: "ms", lowerIsBetter: true },
-  pattern:       { label: "図形記憶",       unit: "点" },
+  pattern:       { label: "図形記憶",       unit: "個" },
 };
 
 export const GAME_IDS = Object.keys(GAME_META) as GameId[];
@@ -60,7 +60,12 @@ export function getAllPersonalBests(): PersonalBests {
 }
 
 /** スコアを保存し、新しいベスト値を返す */
-export function saveScore(gameId: GameId, score: number, nickname: string): number {
+export function saveScore(
+  gameId: GameId,
+  score: number,
+  nickname: string,
+  userId?: string // DB 保存用（undefined の場合は localStorage のみ）
+): number {
   const { lowerIsBetter } = GAME_META[gameId];
 
   // 個人ベスト更新
@@ -82,6 +87,17 @@ export function saveScore(gameId: GameId, score: number, nickname: string): numb
   rankings[gameId] = list;
   saveRankings(rankings);
 
+  // DB に非同期で保存（fire-and-forget）
+  if (userId) {
+    import("@/app/actions/user").then(({ recordScore }) => {
+      recordScore({ userId, gameId, score }).catch((e) => {
+        console.warn("[saveScore] recordScore failed:", e);
+      });
+    }).catch((e) => {
+      console.warn("[saveScore] import failed:", e);
+    });
+  }
+
   return newBest;
 }
 
@@ -94,7 +110,7 @@ export interface RankEntry {
   date: string;
 }
 
-/** 種目別ランキング: ニックネームごとのベストのみ、上位30件 */
+/** 種目別ランキング: ニックネームごとのベストのみ、上位10件 */
 export function getGameRanking(gameId: GameId): RankEntry[] {
   const { lowerIsBetter } = GAME_META[gameId];
   const list = loadRankings()[gameId] ?? [];
@@ -117,7 +133,7 @@ export function getGameRanking(gameId: GameId): RankEntry[] {
     .sort((a, b) =>
       lowerIsBetter ? a.score - b.score : b.score - a.score
     )
-    .slice(0, 30)
+    .slice(0, 10)
     .map((e, i) => ({ rank: i + 1, nickname: e.nickname, score: e.score, date: e.date }));
 }
 
@@ -195,7 +211,78 @@ export function getOverallRanking(): OverallEntry[] {
 
   return entries
     .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
+    .slice(0, 10)
     .map((e, i) => ({ ...e, rank: i + 1 }));
+}
+
+/** 指定ニックネームの種目別ランク（全件検索）*/
+export function getUserGameRankEntry(gameId: GameId, nickname: string): RankEntry | null {
+  const { lowerIsBetter } = GAME_META[gameId];
+  const list = loadRankings()[gameId] ?? [];
+
+  const bestMap = new Map<string, ScoreEntry>();
+  for (const entry of list) {
+    const prev = bestMap.get(entry.nickname);
+    if (!prev) {
+      bestMap.set(entry.nickname, entry);
+    } else {
+      const isBetter = lowerIsBetter ? entry.score < prev.score : entry.score > prev.score;
+      if (isBetter) bestMap.set(entry.nickname, entry);
+    }
+  }
+
+  const sorted = [...bestMap.values()]
+    .sort((a, b) => lowerIsBetter ? a.score - b.score : b.score - a.score);
+
+  const idx = sorted.findIndex((e) => e.nickname === nickname);
+  if (idx === -1) return null;
+  const e = sorted[idx];
+  return { rank: idx + 1, nickname: e.nickname, score: e.score, date: e.date };
+}
+
+/** 指定ニックネームの総合ランク（全件検索）*/
+export function getUserOverallRankEntry(nickname: string): OverallEntry | null {
+  const rankings = loadRankings();
+  const playerBests = new Map<string, Partial<Record<GameId, number>>>();
+
+  for (const gameId of GAME_IDS) {
+    const list = rankings[gameId] ?? [];
+    const { lowerIsBetter } = GAME_META[gameId];
+    const bestMap = new Map<string, number>();
+    for (const e of list) {
+      const prev = bestMap.get(e.nickname);
+      if (prev === undefined) {
+        bestMap.set(e.nickname, e.score);
+      } else {
+        bestMap.set(e.nickname, lowerIsBetter ? Math.min(prev, e.score) : Math.max(prev, e.score));
+      }
+    }
+    for (const [nick, score] of bestMap.entries()) {
+      if (!playerBests.has(nick)) playerBests.set(nick, {});
+      playerBests.get(nick)![gameId] = score;
+    }
+  }
+
+  const entries: OverallEntry[] = [];
+  for (const [nick, bests] of playerBests.entries()) {
+    let totalPoints = 0;
+    let gamesPlayed = 0;
+    for (const [gameId, score] of Object.entries(bests) as [GameId, number][]) {
+      if (score === undefined) continue;
+      gamesPlayed++;
+      const ref = POINTS_REF[gameId];
+      const { lowerIsBetter } = GAME_META[gameId];
+      const ratio = lowerIsBetter ? ref / score : score / ref;
+      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
+    }
+    entries.push({ rank: 0, nickname: nick, totalPoints, gamesPlayed, details: bests });
+  }
+
+  const sorted = entries
+    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
+    .map((e, i) => ({ ...e, rank: i + 1 }));
+
+  return sorted.find((e) => e.nickname === nickname) ?? null;
 }
 
 /** 全ゲームの累計プレイ回数を返す */

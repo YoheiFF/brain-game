@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
-import { getNickname, getAge } from "@/lib/nickname";
+import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
@@ -28,6 +28,7 @@ export default function MemoryNumberGame() {
   const [showIndex, setShowIndex] = useState(-1);
   const [inputTimeLeft, setInputTimeLeft] = useState(0);
   const inputTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gameEndedRef = useRef(false);
 
   useEffect(() => {
     setBest(getPersonalBest("memory-number"));
@@ -35,6 +36,7 @@ export default function MemoryNumberGame() {
   }, []);
 
   const startRound = useCallback((len: number) => {
+    gameEndedRef.current = false;
     const seq = generateSequence(len);
     setSequence(seq);
     setInput("");
@@ -69,8 +71,10 @@ export default function MemoryNumberGame() {
           clearInterval(inputTimerRef.current!);
           setPhase("wrong");
           setTimeout(() => {
+            if (gameEndedRef.current) return;
+            gameEndedRef.current = true;
             setSequence((seq) => {
-              const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト");
+              const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId());
               setBest(newBest);
               setIsNewBest(newBest === level);
               return seq;
@@ -105,7 +109,9 @@ export default function MemoryNumberGame() {
     } else {
       setPhase("wrong");
       setTimeout(() => {
-        const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト");
+        if (gameEndedRef.current) return;
+        gameEndedRef.current = true;
+        const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId());
         recordPlay("memory-number", level);
         setRemaining(getRemainingPlays("memory-number"));
         setBest(newBest);
