@@ -3,11 +3,11 @@ import { GAME_META } from "./scores"
 
 // 20代平均スコアを10点の基準として換算
 const REFERENCE: Record<GameId, number> = {
-  calculation: 17,
-  "memory-number": 8,
-  stroop: 23,
-  reaction: 220,
-  pattern: 18,
+  calculation: 13,
+  "memory-number": 7,
+  stroop: 18,
+  reaction: 250,
+  pattern: 8,
 }
 
 /** ゲームの生スコアを 1〜20 点に換算する */
