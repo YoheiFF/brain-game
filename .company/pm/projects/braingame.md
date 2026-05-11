@@ -53,7 +53,8 @@ Capacitor で Android アプリにも対応。
 | 5 | 次フェーズ（未定） | - | 🔲 未着手 |
 
 ## 関連チケット
-- （現在オープンチケットなし）
+- [x] `2026-05-11-ranking-score-refactor.md` — ランキング計算ロジック修正（done）
+- [x] `2026-05-11-pattern-game-grid-5x5.md` — 図形記憶グリッド4×4→5×5（done）
 
 ## 関連部署
 - engineering: 実装担当

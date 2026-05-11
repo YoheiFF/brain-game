@@ -10,7 +10,7 @@ import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
-const GRID = 4;
+const GRID = 5;
 const TOTAL = GRID * GRID;
 
 function generatePattern(count: number): Set<number> {
@@ -156,7 +156,7 @@ export default function PatternGame() {
                 const isSelected = selected.has(i);
                 const isWrong = wrongCells.has(i);
 
-                let cellClass = "w-14 h-14 rounded-lg transition-all duration-150 cursor-pointer border-2 ";
+                let cellClass = "w-12 h-12 rounded-lg transition-all duration-150 cursor-pointer border-2 ";
                 if (phase === "showing") {
                   cellClass += isPattern
                     ? "bg-[#6c63ff] border-[#8b83ff] scale-105"
