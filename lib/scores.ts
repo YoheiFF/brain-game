@@ -89,12 +89,12 @@ export function saveScore(
 
   // DB に非同期で保存（fire-and-forget）
   if (userId) {
-    import("@/app/actions/user").then(({ recordScore }) => {
-      recordScore({ userId, gameId, score }).catch((e) => {
-        console.warn("[saveScore] recordScore failed:", e);
-      });
+    fetch("/api/record-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, gameId, score }),
     }).catch((e) => {
-      console.warn("[saveScore] import failed:", e);
+      console.warn("[saveScore] record-score API failed:", e);
     });
   }
 

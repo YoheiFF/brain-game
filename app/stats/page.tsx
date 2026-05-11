@@ -9,6 +9,7 @@ import { getAllTitles } from "@/lib/titles"
 import { getDailyHistory, getDailyBests } from "@/lib/daily"
 import RadarChart from "@/components/RadarChart"
 import MiniBarChart from "@/components/MiniBarChart"
+import { useDbSync } from "@/hooks/useDbSync"
 
 type Tab = "today" | "alltime"
 
@@ -26,6 +27,10 @@ export default function StatsPage() {
   const [mounted, setMounted] = useState(false)
   const [tab, setTab] = useState<Tab>("today")
 
+  // 初回マウント時のみ DB から最新データを取得して localStorage を更新（BUG-3 補完）
+  const { data: syncData } = useDbSync({ interval: null })
+
+  // 初回マウント時に localStorage から読み込む（既存）
   useEffect(() => {
     setMounted(true)
     setBests(getAllPersonalBests())
@@ -33,6 +38,15 @@ export default function StatsPage() {
     setAge(getAge())
     setTotalPlays(getTotalPlayCount())
   }, [])
+
+  // DB 同期完了後に画面を再描画（追加）
+  useEffect(() => {
+    if (!syncData) return
+    // useDbSync が localStorage を更新済みのため、再読み込みで最新値を取得する
+    setBests(getAllPersonalBests())
+    setDailyBests(getDailyBests())
+    setTotalPlays(getTotalPlayCount())
+  }, [syncData])
 
   if (!mounted) return null
 
