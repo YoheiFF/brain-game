@@ -19,7 +19,7 @@ const GAMES: {
 }[] = [
   { id: "calculation",    title: "計算ゲーム",     description: "30秒間で四則演算を解け！",       icon: "🧮", color: "from-violet-600 to-purple-700", unit: "問" },
   { id: "memory-number",  title: "数字記憶",       description: "数列を覚えて正確に入力しよう",   icon: "🔢", color: "from-blue-600 to-cyan-600",     unit: "桁" },
-  { id: "stroop",         title: "ストループテスト", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "点" },
+  { id: "stroop",         title: "ストループ", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "点" },
   { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "ms", lowerIsBetter: true },
   { id: "pattern",        title: "図形記憶",       description: "光ったマスのパターンを記憶せよ", icon: "🧩", color: "from-green-600 to-teal-600",    unit: "点" },
 ];

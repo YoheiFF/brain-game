@@ -63,7 +63,7 @@ export default function RankingsPage() {
       {tab === "overall" && (
         <div className="animate-fade-in">
           <p className="text-[#64748b] text-xs mb-4">
-            各種目のスコアを正規化して合算したポイント順
+            各種目のスコアを20代平均基準で換算した合計点順（最大100点）
           </p>
           {overall.length === 0 ? (
             <EmptyState />
@@ -99,7 +99,7 @@ export default function RankingsPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
-                    <p className="text-[#64748b] text-xs">pt</p>
+                    <p className="text-[#64748b] text-xs">/ 100点</p>
                     <p className="text-[#64748b] text-xs mt-0.5">{e.gamesPlayed}/5種目</p>
                   </div>
                 </div>

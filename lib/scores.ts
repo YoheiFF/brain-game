@@ -131,10 +131,20 @@ export interface OverallEntry {
   details: Partial<Record<GameId, number>>;
 }
 
+// game-points.ts と同じ基準値（20代平均スコア）
+// 循環インポートを避けるため scores.ts 内に定義
+const POINTS_REF: Record<GameId, number> = {
+  calculation: 17,
+  "memory-number": 8,
+  stroop: 23,
+  reaction: 220,
+  pattern: 18,
+};
+
 /**
  * 総合ランキング
- * 各種目のベストスコアを 0〜100 に正規化してポイント合計を算出。
- * reaction は lowerIsBetter のため逆正規化。
+ * 各種目のベストスコアを20代平均基準で1〜20点に換算して合算。
+ * TOP画面の calcTotalPoints と同方式で最大100点。
  */
 export function getOverallRanking(): OverallEntry[] {
   const rankings = loadRankings();
@@ -162,40 +172,22 @@ export function getOverallRanking(): OverallEntry[] {
 
   if (playerBests.size === 0) return [];
 
-  // 各ゲームの全プレイヤー最大・最小を求めて正規化係数を計算
-  const gameStats = new Map<GameId, { max: number; min: number }>();
-  for (const gameId of GAME_IDS) {
-    const scores = [...playerBests.values()]
-      .map((d) => d[gameId])
-      .filter((s): s is number => s !== undefined);
-    if (scores.length === 0) continue;
-    gameStats.set(gameId, { max: Math.max(...scores), min: Math.min(...scores) });
-  }
-
   const entries: OverallEntry[] = [];
   for (const [nickname, bests] of playerBests.entries()) {
     let totalPoints = 0;
     let gamesPlayed = 0;
-    for (const gameId of GAME_IDS) {
-      const score = bests[gameId];
-      const stats = gameStats.get(gameId);
-      if (score === undefined || !stats) continue;
+    for (const [gameId, score] of Object.entries(bests) as [GameId, number][]) {
+      if (score === undefined) continue;
       gamesPlayed++;
+      const ref = POINTS_REF[gameId];
       const { lowerIsBetter } = GAME_META[gameId];
-      let normalized: number;
-      if (stats.max === stats.min) {
-        normalized = 100;
-      } else if (lowerIsBetter) {
-        normalized = ((stats.max - score) / (stats.max - stats.min)) * 100;
-      } else {
-        normalized = ((score - stats.min) / (stats.max - stats.min)) * 100;
-      }
-      totalPoints += normalized;
+      const ratio = lowerIsBetter ? ref / score : score / ref;
+      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
     }
     entries.push({
       rank: 0,
       nickname,
-      totalPoints: Math.round(totalPoints),
+      totalPoints,
       gamesPlayed,
       details: bests,
     });
