@@ -32,7 +32,7 @@ interface DailyRecord {
 /**
  * /api/sync の dailyPlays を braingame_daily localStorage に書き戻す。
  * - 今日のデータのみを対象とする（日付変わりで自動リセット）
- * - DB のプレイ数 >= ローカルのプレイ数 の場合のみ上書き（DB を正として採用）
+ * - DB のプレイ数をそのままローカルに反映（DB を正として常に上書き）
  * - bestScores は DB 値を優先して上書き（DB に記録された正確な値を反映）
  */
 function mergeDailyPlaysToStorage(
@@ -63,8 +63,8 @@ function mergeDailyPlaysToStorage(
 
     const localPlayCount = record.plays[gameId] ?? 0;
 
-    // DB のプレイ数がローカルより多い場合のみ上書き（より多くプレイ済みの値を採用）
-    if (dbEntry.playCount > localPlayCount) {
+    // DB を正として常に上書き（管理者リセット・複数端末同期を正しく反映するため）
+    if (dbEntry.playCount !== localPlayCount) {
       record.plays[gameId] = dbEntry.playCount;
       changed = true;
     }
