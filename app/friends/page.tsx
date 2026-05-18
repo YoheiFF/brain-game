@@ -60,6 +60,17 @@ export default function FriendsPage() {
     getMyFriendCode(uid).then(setMyCode).catch(console.error);
   }, []);
 
+  // 30秒ポーリング（フレンド申請の着信確認）
+  useEffect(() => {
+    if (!userId) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchPending(userId);
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [userId]);
+
   const handleCopy = async () => {
     if (!myCode) return;
     try {

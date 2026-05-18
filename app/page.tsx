@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAllPersonalBests, type GameId, GAME_IDS } from "@/lib/scores";
 import { calcGamePoints, calcTotalPoints } from "@/lib/game-points";
-import { getNickname, hasNickname, getAge } from "@/lib/nickname";
+import { getNickname, hasNickname, getAge, getUserId } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
 import { getBenchmark } from "@/lib/benchmarks";
 import { getAllRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
@@ -33,6 +33,7 @@ export default function Home() {
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [modalMode, setModalMode] = useState<"setup" | "change">("setup");
   const [mounted, setMounted] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   // ホームはポーリングなし（初回フェッチのみ）
   const { data: syncData, loading: syncLoading } = useDbSync({ interval: null });
@@ -47,6 +48,15 @@ export default function Home() {
     if (!hasNickname()) {
       setModalMode("setup");
       setShowNicknameModal(true);
+    }
+
+    // フレンド申請バッジ
+    const uid = getUserId();
+    if (uid) {
+      fetch(`/api/friends/pending?userId=${uid}`)
+        .then((r) => r.ok ? r.json() : [])
+        .then((data: { requesterId: string }[]) => setPendingCount(data.length))
+        .catch(() => {});
     }
   }, []);
 
@@ -113,9 +123,14 @@ export default function Home() {
           </Link>
           <Link
             href="/friends"
-            className="flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+            className="relative flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
           >
             👥 フレンド
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
+                {pendingCount}
+              </span>
+            )}
           </Link>
         </div>
       </div>
