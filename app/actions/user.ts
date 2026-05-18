@@ -7,6 +7,7 @@ import {
   recordDailyPlay,
   updateDailyHistory,
 } from "@/lib/db-scores";
+import { getOrCreateFriendCode } from "@/lib/db-friends";
 import { GAME_IDS, GAME_META, type GameId } from "@/lib/scores";
 
 // ── バリデーション定数 ───────────────────────────────────
@@ -88,6 +89,13 @@ export async function upsertUser(input: UpsertUserInput): Promise<ActionResult> 
       nickname: trimmedNickname,
       age: input.age,
     });
+    // フレンドコードの自動生成
+    try {
+      await getOrCreateFriendCode(input.id);
+    } catch (e) {
+      // フレンドコード生成失敗はログのみ（ユーザー登録自体は成功させる）
+      console.warn("[upsertUser] getOrCreateFriendCode 失敗:", e);
+    }
     return { success: true };
   } catch (e) {
     console.error("[upsertUser]", e);
@@ -113,7 +121,7 @@ export async function recordScore(input: RecordScoreInput): Promise<ActionResult
 
   try {
     // [追加] レート制限チェック（DB 参照）
-    const db = getDb();
+    const db = await getDb();
     const today = new Date().toISOString().slice(0, 10);
     const playResult = await db.execute({
       sql: "SELECT play_count FROM daily_plays WHERE user_id = ? AND game_id = ? AND play_date = ?",

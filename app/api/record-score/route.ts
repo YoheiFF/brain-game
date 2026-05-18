@@ -107,7 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     // 1日上限チェック（DB 参照）
-    const db = getDb();
+    const db = await getDb();
     const today = new Date().toISOString().slice(0, 10);
     const playResult = await db.execute({
       sql: "SELECT play_count FROM daily_plays WHERE user_id = ? AND game_id = ? AND play_date = ?",

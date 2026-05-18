@@ -49,3 +49,30 @@ export interface SyncResponse {
   myGameRanks: Partial<Record<GameId, RankEntry>>;
   myOverallRank: OverallEntry | null;
 }
+
+// フレンドシップのステータス
+export type FriendshipStatus = 'pending' | 'accepted' | 'rejected';
+
+// friendships テーブルの行
+export interface Friendship {
+  id: number;
+  requesterId: string;
+  addresseeId: string;
+  status: FriendshipStatus;
+  createdAt: string;  // ISO 8601
+  updatedAt: string;  // ISO 8601
+}
+
+// フレンド一覧の各エントリ（GET /api/friends レスポンス）
+export interface FriendEntry {
+  userId: string;
+  nickname: string;
+  friendCode: string | null;
+}
+
+// 受信した申請の各エントリ（GET /api/friends/pending レスポンス）
+export interface PendingRequest {
+  requesterId: string;
+  requesterNickname: string;
+  createdAt: string;  // ISO 8601
+}

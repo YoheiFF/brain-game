@@ -111,6 +111,12 @@ export default function Home() {
           >
             🏆 ランキング
           </Link>
+          <Link
+            href="/friends"
+            className="flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+          >
+            👥 フレンド
+          </Link>
         </div>
       </div>
 

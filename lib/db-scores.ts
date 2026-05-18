@@ -16,7 +16,7 @@ export async function saveScoreToDb(
   gameId: GameId,
   score: number
 ): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   const now = new Date().toISOString();
   await db.execute({
     sql: "INSERT INTO scores (user_id, game_id, score, created_at) VALUES (?, ?, ?, ?)",
@@ -27,7 +27,7 @@ export async function saveScoreToDb(
 export async function getPersonalBestsFromDb(
   userId: string
 ): Promise<Partial<Record<GameId, number>>> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db.execute({
     sql: `SELECT game_id, MAX(score) as max_s, MIN(score) as min_s
           FROM scores
@@ -52,7 +52,7 @@ export async function getRankingsFromDb(): Promise<{
   gameRankings: Partial<Record<GameId, RankEntry[]>>;
   overallRanking: OverallEntry[];
 }> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db.execute({
     sql: `SELECT s.user_id, u.nickname, s.game_id,
                  MAX(s.score) as max_score,
@@ -143,7 +143,7 @@ export async function getUserRanksFromDb(userId: string): Promise<{
   gameRanks: Partial<Record<GameId, RankEntry>>;
   overallRank: OverallEntry | null;
 }> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db.execute({
     sql: `SELECT s.user_id, u.nickname, s.game_id,
                  MAX(s.score) as max_score,
@@ -216,12 +216,111 @@ export async function getUserRanksFromDb(userId: string): Promise<{
   return { gameRanks, overallRank };
 }
 
+export async function getFriendRankingsFromDb(
+  userId: string,
+  friendIds: string[]
+): Promise<{
+  gameRankings: Partial<Record<GameId, RankEntry[]>>;
+  overallRanking: OverallEntry[];
+}> {
+  const db = await getDb();
+
+  // 自分 + フレンドの ID リスト
+  const allIds = [userId, ...friendIds];
+  const placeholders = allIds.map(() => '?').join(', ');
+
+  const result = await db.execute({
+    sql: `SELECT s.user_id, u.nickname, s.game_id,
+                 MAX(s.score) as max_score,
+                 MIN(s.score) as min_score,
+                 MAX(s.created_at) as latest_date
+          FROM scores s
+          JOIN users u ON s.user_id = u.id
+          WHERE s.user_id IN (${placeholders})
+          GROUP BY s.user_id, s.game_id`,
+    args: allIds,
+  });
+
+  // ゲーム別ランキング構築
+  const gameMap: Partial<Record<GameId, Array<{ nickname: string; score: number; date: string }>>> = {};
+  // 総合ランキング用: user_id -> { nickname, bests }
+  const userBests = new Map<string, { nickname: string; bests: Partial<Record<GameId, number>> }>();
+
+  for (const row of result.rows) {
+    const gameId = row.game_id as GameId;
+    if (!GAME_IDS.includes(gameId)) continue;
+    const { lowerIsBetter } = GAME_META[gameId];
+    const score = lowerIsBetter
+      ? (row.min_score as number)
+      : (row.max_score as number);
+    const nickname = row.nickname as string;
+    const uid = row.user_id as string;
+    const date = row.latest_date as string;
+
+    // ゲーム別
+    if (!gameMap[gameId]) gameMap[gameId] = [];
+    gameMap[gameId]!.push({ nickname, score, date });
+
+    // 総合用
+    if (!userBests.has(uid)) {
+      userBests.set(uid, { nickname, bests: {} });
+    }
+    userBests.get(uid)!.bests[gameId] = score;
+  }
+
+  // ゲーム別ランキング: ソート & 上位20件
+  const gameRankings: Partial<Record<GameId, RankEntry[]>> = {};
+  for (const gameId of GAME_IDS) {
+    const list = gameMap[gameId] ?? [];
+    const { lowerIsBetter } = GAME_META[gameId];
+    const sorted = list
+      .sort((a, b) => (lowerIsBetter ? a.score - b.score : b.score - a.score))
+      .slice(0, 20);
+    gameRankings[gameId] = sorted.map((e, i) => ({
+      rank: i + 1,
+      nickname: e.nickname,
+      score: e.score,
+      date: e.date,
+    }));
+  }
+
+  // 総合ランキング計算
+  const overallEntries: OverallEntry[] = [];
+  for (const [, { nickname, bests }] of userBests.entries()) {
+    let totalPoints = 0;
+    let gamesPlayed = 0;
+    for (const gameId of GAME_IDS) {
+      const score = bests[gameId];
+      if (score === undefined) continue;
+      gamesPlayed++;
+      const ref = POINTS_REF[gameId];
+      const { lowerIsBetter } = GAME_META[gameId];
+      const ratio = lowerIsBetter ? ref / score : score / ref;
+      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
+    }
+    overallEntries.push({
+      rank: 0,
+      nickname,
+      totalPoints,
+      gamesPlayed,
+      details: bests,
+    });
+  }
+
+  const overallRanking = overallEntries
+    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
+    .slice(0, 20)
+    .map((e, i) => ({ ...e, rank: i + 1 }));
+
+  return { gameRankings, overallRanking };
+}
+
 export async function recordDailyPlay(
   userId: string,
   gameId: GameId,
   score: number
 ): Promise<{ playCount: number; bestScore: number }> {
-  const db = getDb();
+  const db = await getDb();
   const today = new Date().toISOString().slice(0, 10);
 
   // 既存レコードを取得
@@ -255,7 +354,7 @@ export async function recordDailyPlay(
 }
 
 export async function updateDailyHistory(userId: string): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   const today = new Date().toISOString().slice(0, 10);
 
   const result = await db.execute({
@@ -290,7 +389,7 @@ export async function updateDailyHistory(userId: string): Promise<void> {
 export async function getDailyPlaysFromDb(
   userId: string
 ): Promise<Partial<Record<GameId, { playCount: number; bestScore: number | null }>>> {
-  const db = getDb();
+  const db = await getDb();
   const today = new Date().toISOString().slice(0, 10);
 
   const result = await db.execute({
@@ -314,7 +413,7 @@ export async function getDailyHistoryFromDb(
   userId: string,
   days: number
 ): Promise<DailyHistoryEntry[]> {
-  const db = getDb();
+  const db = await getDb();
 
   const result = await db.execute({
     sql: `SELECT play_date, total_points, games_played

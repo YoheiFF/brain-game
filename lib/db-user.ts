@@ -2,7 +2,7 @@ import { getDb } from "@/lib/db";
 import type { User } from "@/lib/db-types";
 
 export async function getUser(userId: string): Promise<User | null> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db.execute({
     sql: "SELECT id, nickname, age, created_at, updated_at FROM users WHERE id = ?",
     args: [userId],
@@ -25,7 +25,7 @@ export async function getOrCreateUser(user: {
   nickname: string;
   age: number | null;
 }): Promise<User> {
-  const db = getDb();
+  const db = await getDb();
   const now = new Date().toISOString();
 
   await db.execute({
@@ -49,7 +49,7 @@ export async function updateUser(
 
   if (!hasNickname && !hasAge) return;
 
-  const db = getDb();
+  const db = await getDb();
   const now = new Date().toISOString();
 
   if (hasNickname && hasAge) {
