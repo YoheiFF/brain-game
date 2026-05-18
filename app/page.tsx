@@ -114,19 +114,19 @@ export default function Home() {
       <div className="flex gap-2 mb-6 animate-fade-in">
         <Link
           href="/stats"
-          className="flex-1 flex items-center justify-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-sm font-bold px-3 py-2 rounded-xl transition-all"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-sm font-bold px-3 py-2 rounded-xl transition-all whitespace-nowrap"
         >
           🧠 統計
         </Link>
         <Link
           href="/rankings"
-          className="flex-1 flex items-center justify-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-bold px-3 py-2 rounded-xl transition-all"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-bold px-3 py-2 rounded-xl transition-all whitespace-nowrap"
         >
           🏆 ランキング
         </Link>
         <Link
           href="/friends"
-          className="relative flex-1 flex items-center justify-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-3 py-2 rounded-xl transition-all"
+          className="relative flex-1 flex items-center justify-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-3 py-2 rounded-xl transition-all whitespace-nowrap"
         >
           👥 フレンド
           {pendingCount > 0 && (
