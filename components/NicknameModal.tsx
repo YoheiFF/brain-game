@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { getNickname, setNickname, getAge, setAge, getOrInitUserId } from "@/lib/nickname";
 import { upsertUser } from "@/app/actions/user";
 
@@ -12,6 +13,7 @@ export default function NicknameModal({ onClose, mode = "setup" }: Props) {
   const [value, setValue] = useState("");
   const [ageValue, setAgeValue] = useState("");
   const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -97,6 +99,28 @@ export default function NicknameModal({ onClose, mode = "setup" }: Props) {
           </div>
 
           {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+
+          {mode === "setup" && (
+            <label className="flex items-start gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 accent-[#6c63ff] cursor-pointer"
+              />
+              <span className="text-[#64748b] text-xs leading-relaxed">
+                <Link
+                  href="/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#6c63ff] underline hover:text-purple-400"
+                >
+                  プライバシーポリシー
+                </Link>
+                に同意する
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="flex gap-3 w-full">
@@ -110,7 +134,7 @@ export default function NicknameModal({ onClose, mode = "setup" }: Props) {
           )}
           <button
             onClick={handleSubmit}
-            disabled={value.trim().length === 0}
+            disabled={value.trim().length === 0 || (mode === "setup" && !agreed)}
             className="btn-primary flex-1 disabled:opacity-40"
           >
             {mode === "setup" ? "はじめる！" : "変更する"}

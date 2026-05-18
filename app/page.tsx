@@ -207,6 +207,11 @@ export default function Home() {
       <p className="text-center text-[#2a2a4a] text-xs mt-10">
         {syncLoading ? "サーバーと同期中..." : "スコアはクラウドに保存されます"}
       </p>
+      <p className="text-center mt-2">
+        <Link href="/privacy-policy" className="text-[#2a2a4a] text-xs hover:text-[#64748b] transition-colors">
+          プライバシーポリシー
+        </Link>
+      </p>
     </main>
   );
 }
