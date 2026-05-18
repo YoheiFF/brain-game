@@ -33,13 +33,17 @@ export async function getDb(): Promise<Client> {
 
   if (!migrationDone) {
     // --- マイグレーション: friend_code カラム ---
+    // SQLite は ADD COLUMN に UNIQUE 制約を付けられないため、カラム追加とインデックス作成を分ける
     try {
       await client.execute(
-        "ALTER TABLE users ADD COLUMN friend_code TEXT UNIQUE"
+        "ALTER TABLE users ADD COLUMN friend_code TEXT"
       );
     } catch {
-      // "duplicate column name" エラーは無視（既に存在する）
+      // "duplicate column name" は無視（既に存在する）
     }
+    await client.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_friend_code ON users(friend_code) WHERE friend_code IS NOT NULL"
+    );
 
     // --- マイグレーション: friendships テーブル ---
     await client.execute(`
