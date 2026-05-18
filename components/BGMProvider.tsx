@@ -30,10 +30,42 @@ export function useBGM() {
 export default function BGMProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const gamePausedRef = useRef(false);
+  // Ref で同期的にミュート状態を管理（play/pause の判断に使う）
+  const mutedRef = useRef(false);
+  // 進行中の play() Promise を追跡（Androidで pause() が無視されるのを防ぐ）
+  const playPromiseRef = useRef<Promise<void> | null>(null);
+
   const [muted, setMuted] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("bgm_muted") === "true";
   });
+  // state と ref を常に同期
+  mutedRef.current = muted;
+
+  // play() を安全に呼ぶ（Promise を記録）
+  const safePlay = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const p = audio.play();
+    if (p) {
+      playPromiseRef.current = p;
+      p.then(() => { playPromiseRef.current = null; })
+       .catch(() => { playPromiseRef.current = null; });
+    }
+  }, []);
+
+  // pause() を安全に呼ぶ（進行中の play() Promise 解決後にポーズ）
+  const safePause = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playPromiseRef.current) {
+      playPromiseRef.current
+        .then(() => audio.pause())
+        .catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }, []);
 
   useEffect(() => {
     const audio = new Audio("/music/gameplay_town_theme.mp3");
@@ -41,53 +73,55 @@ export default function BGMProvider({ children }: { children: ReactNode }) {
     audio.volume = 0.4;
     audioRef.current = audio;
 
-    if (!muted) {
-      audio.play().catch(() => {
-        const start = () => {
-          if (!gamePausedRef.current && !audio.paused === false) {
-            audio.play().catch(() => {});
-          }
-          document.removeEventListener("click", start, true);
-          document.removeEventListener("touchstart", start, true);
-        };
-        document.addEventListener("click", start, true);
-        document.addEventListener("touchstart", start, true);
-      });
+    if (!mutedRef.current) {
+      const p = audio.play();
+      if (p) {
+        playPromiseRef.current = p;
+        p.then(() => { playPromiseRef.current = null; })
+         .catch(() => {
+           playPromiseRef.current = null;
+           // オートプレイがブロックされた場合は最初のユーザー操作で再生
+           const start = () => {
+             if (!mutedRef.current) safePlay();
+             document.removeEventListener("click", start, true);
+             document.removeEventListener("touchstart", start, true);
+           };
+           document.addEventListener("click", start, true);
+           document.addEventListener("touchstart", start, true);
+         });
+      }
     }
 
     return () => {
       audio.pause();
       audio.src = "";
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // mutedRef を使うので muted state に依存しない → 安定したコールバック
   const pause = useCallback(() => {
     gamePausedRef.current = true;
-    audioRef.current?.pause();
-  }, []);
+    safePause();
+  }, [safePause]);
 
   const resume = useCallback(() => {
     gamePausedRef.current = false;
-    if (!muted && audioRef.current) {
-      audioRef.current.play().catch(() => {});
-    }
-  }, [muted]);
+    if (!mutedRef.current) safePlay();
+  }, [safePlay]);
 
   const toggleMute = useCallback(() => {
-    setMuted((prev) => {
-      const next = !prev;
-      localStorage.setItem("bgm_muted", String(next));
-      if (audioRef.current) {
-        if (next) {
-          audioRef.current.pause();
-        } else if (!gamePausedRef.current) {
-          audioRef.current.play().catch(() => {});
-        }
-      }
-      return next;
-    });
-  }, []);
+    const newMuted = !mutedRef.current;
+    // ref を即時更新（非同期の setState より先に判断に使われる）
+    mutedRef.current = newMuted;
+    setMuted(newMuted);
+    localStorage.setItem("bgm_muted", String(newMuted));
+    if (newMuted) {
+      safePause();
+    } else if (!gamePausedRef.current) {
+      safePlay();
+    }
+  }, [safePause, safePlay]);
 
   return (
     <BGMContext.Provider value={{ pause, resume, muted, toggleMute }}>
