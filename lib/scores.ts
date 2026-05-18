@@ -133,7 +133,7 @@ export function getGameRanking(gameId: GameId): RankEntry[] {
     .sort((a, b) =>
       lowerIsBetter ? a.score - b.score : b.score - a.score
     )
-    .slice(0, 10)
+    .slice(0, 20)
     .map((e, i) => ({ rank: i + 1, nickname: e.nickname, score: e.score, date: e.date }));
 }
 
@@ -211,7 +211,7 @@ export function getOverallRanking(): OverallEntry[] {
 
   return entries
     .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
-    .slice(0, 10)
+    .slice(0, 20)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }
 
