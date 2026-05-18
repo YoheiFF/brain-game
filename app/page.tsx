@@ -88,51 +88,53 @@ export default function Home() {
       )}
 
       {/* ヘッダー */}
-      <div className="flex items-start justify-between mb-8 animate-fade-in">
+      <div className="flex items-start justify-between mb-4 animate-fade-in">
         <div>
           <h1 className="text-4xl font-black text-white">🧠 BrainGame</h1>
           <p className="text-[#64748b] text-sm mt-1">脳トレゲームで思考力を鍛えよう</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          {nickname && (
-            <div className="flex items-center gap-2">
-              <span className="text-[#64748b] text-xs">プレイヤー</span>
-              <span className="text-white font-bold text-sm bg-[#1a1a2e] border border-[#2a2a4a] px-3 py-1 rounded-full">
-                {nickname}{age !== null ? ` (${age}歳)` : ""}
-              </span>
-              <button
-                onClick={() => { setModalMode("change"); setShowNicknameModal(true); }}
-                className="text-[#64748b] hover:text-white text-xs transition-colors"
-                title="ニックネームを変更"
-              >
-                ✏️
-              </button>
-            </div>
+        {nickname && (
+          <div className="flex items-center gap-2">
+            <span className="text-[#64748b] text-xs">プレイヤー</span>
+            <span className="text-white font-bold text-sm bg-[#1a1a2e] border border-[#2a2a4a] px-3 py-1 rounded-full">
+              {nickname}{age !== null ? ` (${age}歳)` : ""}
+            </span>
+            <button
+              onClick={() => { setModalMode("change"); setShowNicknameModal(true); }}
+              className="text-[#64748b] hover:text-white text-xs transition-colors"
+              title="ニックネームを変更"
+            >
+              ✏️
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ナビゲーションボタン */}
+      <div className="flex gap-2 mb-6 animate-fade-in">
+        <Link
+          href="/stats"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-sm font-bold px-3 py-2 rounded-xl transition-all"
+        >
+          🧠 統計
+        </Link>
+        <Link
+          href="/rankings"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-bold px-3 py-2 rounded-xl transition-all"
+        >
+          🏆 ランキング
+        </Link>
+        <Link
+          href="/friends"
+          className="relative flex-1 flex items-center justify-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-3 py-2 rounded-xl transition-all"
+        >
+          👥 フレンド
+          {pendingCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
+              {pendingCount}
+            </span>
           )}
-          <Link
-            href="/stats"
-            className="flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
-          >
-            🧠 統計
-          </Link>
-          <Link
-            href="/rankings"
-            className="flex items-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
-          >
-            🏆 ランキング
-          </Link>
-          <Link
-            href="/friends"
-            className="relative flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold px-4 py-2 rounded-xl transition-all"
-          >
-            👥 フレンド
-            {pendingCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
-                {pendingCount}
-              </span>
-            )}
-          </Link>
-        </div>
+        </Link>
       </div>
 
       {/* 合計ポイント */}
