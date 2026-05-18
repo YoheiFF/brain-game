@@ -12,7 +12,7 @@ import { useBGM } from "@/components/BGMProvider";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
-const GRID = 5;
+const GRID = 6;
 const TOTAL = GRID * GRID;
 
 function generatePattern(count: number): Set<number> {
@@ -82,7 +82,7 @@ export default function PatternGame() {
       [...selected].every((c) => pattern.has(c));
 
     if (isCorrect) {
-      const newScore = score + 1;
+      const newScore = patternCount;
       setScore(newScore);
       setPhase("correct");
       setTimeout(() => {
@@ -105,7 +105,7 @@ export default function PatternGame() {
     }
   }, [phase, selected, pattern, score, level, startRound]);
 
-  const patternCount = Math.min(level + 2, TOTAL - 1);
+  const patternCount = Math.min(level + 2, 25);
 
   return (
     <div className="game-container">
@@ -170,7 +170,7 @@ export default function PatternGame() {
                 const isSelected = selected.has(i);
                 const isWrong = wrongCells.has(i);
 
-                let cellClass = "w-12 h-12 rounded-lg transition-all duration-150 cursor-pointer border-2 ";
+                let cellClass = "w-10 h-10 rounded-lg transition-all duration-150 cursor-pointer border-2 ";
                 if (phase === "showing") {
                   cellClass += isPattern
                     ? "bg-[#6c63ff] border-[#8b83ff] scale-105"

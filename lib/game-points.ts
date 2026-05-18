@@ -7,7 +7,7 @@ const REFERENCE: Record<GameId, number> = {
   "memory-number": 7,
   stroop: 18,
   reaction: 250,
-  pattern: 8,
+  pattern: 12,
 }
 
 /** ゲームの生スコアを 1〜20 点に換算する */

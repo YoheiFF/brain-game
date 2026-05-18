@@ -75,7 +75,7 @@ const TITLE_DEFS: TitleDef[] = [
       (b["memory-number"] ?? 0) >= 7 &&
       (b.stroop ?? 0) >= 18 &&
       b.reaction !== undefined && b.reaction <= 270 &&
-      (b.pattern ?? 0) >= 13,
+      (b.pattern ?? 0) >= 12,
   },
   {
     id: "stoic",

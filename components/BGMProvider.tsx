@@ -35,12 +35,18 @@ export default function BGMProvider({ children }: { children: ReactNode }) {
   // 進行中の play() Promise を追跡（Androidで pause() が無視されるのを防ぐ）
   const playPromiseRef = useRef<Promise<void> | null>(null);
 
-  const [muted, setMuted] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("bgm_muted") === "true";
-  });
+  const [muted, setMuted] = useState(false);
   // state と ref を常に同期
   mutedRef.current = muted;
+
+  // マウント後に localStorage から復元（SSR hydration ミスマッチ回避）
+  useEffect(() => {
+    const stored = localStorage.getItem("bgm_muted") === "true";
+    if (stored) {
+      mutedRef.current = true;
+      setMuted(true);
+    }
+  }, []);
 
   // play() を安全に呼ぶ（Promise を記録）
   const safePlay = useCallback(() => {

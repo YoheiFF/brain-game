@@ -5,7 +5,7 @@ const AGE_BENCHMARKS: Record<GameId, Record<number, number>> = {
   "memory-number": { 15: 7,  25: 7,  35: 6,  45: 6,  55: 5,  65: 4  },
   stroop:          { 15: 14, 25: 18, 35: 16, 45: 14, 55: 12, 65: 9  },
   reaction:        { 15: 240, 25: 250, 35: 270, 45: 300, 55: 340, 65: 390 },
-  pattern:         { 15: 6,  25: 8,  35: 7,  45: 6,  55: 5,  65: 4  },
+  pattern:         { 15: 10, 25: 12, 35: 11, 45: 9,  55: 8,  65: 6  },
 }
 
 const AGE_POINTS = [15, 25, 35, 45, 55, 65]
