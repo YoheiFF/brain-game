@@ -8,6 +8,7 @@ import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
+import { useBGM } from "@/components/BGMProvider";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -47,6 +48,7 @@ const GAME_TIME = 30;
 
 export default function CalculationGame() {
   const router = useRouter();
+  const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [question, setQuestion] = useState<Question>(generateQuestion());
   const [input, setInput] = useState("");
@@ -87,6 +89,13 @@ export default function CalculationGame() {
     setRemaining(getRemainingPlays("calculation"));
     setRewardedRemaining(getRewardedRemaining("calculation"));
   }, []);
+
+  useEffect(() => {
+    if (phase === "ready" || phase === "result") resume();
+    else pause();
+  }, [phase, pause, resume]);
+
+  useEffect(() => { return () => { resume(); }; }, [resume]);
 
   useEffect(() => {
     if (phase !== "playing") return;

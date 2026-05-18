@@ -8,6 +8,7 @@ import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
+import { useBGM } from "@/components/BGMProvider";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -24,6 +25,7 @@ function generatePattern(count: number): Set<number> {
 
 export default function PatternGame() {
   const router = useRouter();
+  const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [level, setLevel] = useState(3);
   const [pattern, setPattern] = useState<Set<number>>(new Set());
@@ -40,6 +42,13 @@ export default function PatternGame() {
     setRemaining(getRemainingPlays("pattern"));
     setRewardedRemaining(getRewardedRemaining("pattern"));
   }, []);
+
+  useEffect(() => {
+    if (phase === "ready" || phase === "result") resume();
+    else pause();
+  }, [phase, pause, resume]);
+
+  useEffect(() => { return () => { resume(); }; }, [resume]);
 
   const startRound = useCallback((lvl: number) => {
     const p = generatePattern(Math.min(lvl + 2, TOTAL - 1));

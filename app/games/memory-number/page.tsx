@@ -8,6 +8,7 @@ import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
+import { useBGM } from "@/components/BGMProvider";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -19,6 +20,7 @@ const SHOW_MS_PER_DIGIT = 600;
 
 export default function MemoryNumberGame() {
   const router = useRouter();
+  const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [level, setLevel] = useState(3);
   const [sequence, setSequence] = useState<number[]>([]);
@@ -37,6 +39,13 @@ export default function MemoryNumberGame() {
     setRemaining(getRemainingPlays("memory-number"));
     setRewardedRemaining(getRewardedRemaining("memory-number"));
   }, []);
+
+  useEffect(() => {
+    if (phase === "ready" || phase === "result") resume();
+    else pause();
+  }, [phase, pause, resume]);
+
+  useEffect(() => { return () => { resume(); }; }, [resume]);
 
   const startRound = useCallback((len: number) => {
     gameEndedRef.current = false;

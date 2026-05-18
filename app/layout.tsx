@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AdMobInit from "@/components/AdMobInit";
+import BGMProvider from "@/components/BGMProvider";
 
 export const metadata: Metadata = {
   title: "BrainGame - 脳トレアプリ",
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja">
       <body>
         <AdMobInit />
-        {children}
+        <BGMProvider>
+          {children}
+        </BGMProvider>
       </body>
     </html>
   );

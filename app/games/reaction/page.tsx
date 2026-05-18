@@ -8,6 +8,7 @@ import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
+import { useBGM } from "@/components/BGMProvider";
 
 type Phase = "ready" | "waiting" | "go" | "tooEarly" | "result";
 
@@ -17,6 +18,7 @@ const MAX_WAIT = 4000;
 
 export default function ReactionGame() {
   const router = useRouter();
+  const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [round, setRound] = useState(0);
   const [times, setTimes] = useState<number[]>([]);
@@ -33,6 +35,13 @@ export default function ReactionGame() {
     setRemaining(getRemainingPlays("reaction"));
     setRewardedRemaining(getRewardedRemaining("reaction"));
   }, []);
+
+  useEffect(() => {
+    if (phase === "ready" || phase === "result") resume();
+    else pause();
+  }, [phase, pause, resume]);
+
+  useEffect(() => { return () => { resume(); }; }, [resume]);
 
   const startRound = useCallback(() => {
     setPhase("waiting");

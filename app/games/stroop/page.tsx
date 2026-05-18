@@ -8,6 +8,7 @@ import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
+import { useBGM } from "@/components/BGMProvider";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -48,6 +49,7 @@ const GAME_TIME = 30;
 
 export default function StroopGame() {
   const router = useRouter();
+  const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [question, setQuestion] = useState<StroopQuestion>(generateQuestion());
   const [score, setScore] = useState(0);
@@ -66,6 +68,13 @@ export default function StroopGame() {
     setRemaining(getRemainingPlays("stroop"));
     setRewardedRemaining(getRewardedRemaining("stroop"));
   }, []);
+
+  useEffect(() => {
+    if (phase === "ready" || phase === "result") resume();
+    else pause();
+  }, [phase, pause, resume]);
+
+  useEffect(() => { return () => { resume(); }; }, [resume]);
 
   const endGame = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
