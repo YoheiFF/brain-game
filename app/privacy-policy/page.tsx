@@ -36,7 +36,7 @@ export default function PrivacyPolicyPage() {
             <tbody>
               <TableRow label="アプリ名" value="BrainGame" />
               <TableRow label="開発者" value="個人開発者" />
-              <TableRow label="連絡先" value="yoheifuse.0818@gmail.com" />
+              <TableRow label="連絡先" value="creativetan@outlook.jp" />
               <TableRow label="ホスティング" value="Vercel (brain-game-opal.vercel.app)" />
             </tbody>
           </table>
@@ -172,7 +172,7 @@ export default function PrivacyPolicyPage() {
             請求・お問い合わせはメールにて受け付けています:
           </p>
           <p className="mt-1 font-bold text-white">
-            yoheifuse.0818@gmail.com
+            creativetan@outlook.jp
           </p>
           <p className="mt-2">
             アカウントの削除（ユーザーID・スコア・プロフィール情報の全削除）をご希望の場合も、
@@ -220,7 +220,7 @@ export default function PrivacyPolicyPage() {
         {/* 12. お問い合わせ */}
         <Section title="お問い合わせ">
           <p>本ポリシーに関するご質問・ご意見は以下までお問い合わせください。</p>
-          <p className="mt-1 font-bold text-white">yoheifuse.0818@gmail.com</p>
+          <p className="mt-1 font-bold text-white">creativetan@outlook.jp</p>
           <p className="mt-3 text-xs text-[#64748b]">
             個人情報の取り扱いに関する苦情は、個人情報保護委員会（
             <ExternalLink href="https://www.ppc.go.jp/">https://www.ppc.go.jp/</ExternalLink>
