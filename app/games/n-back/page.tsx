@@ -126,7 +126,6 @@ export default function NBackGame() {
         hitsRef.current++;
         setFeedbackType("hit");
       } else {
-        missesRef.current++;
         setFeedbackType("miss");
       }
     } else {
