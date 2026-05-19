@@ -87,9 +87,7 @@ export default function FriendRankingPage() {
 
       {!loading && hasFriends && tab === "overall" && (
         <div className="animate-fade-in">
-          <p className="text-[#64748b] text-xs mb-4">
-            各種目のスコアを20代平均基準で換算した合計点順（最大100点）
-          </p>
+          <p className="text-[#64748b] text-xs mb-4">各ゲームポイント（20点満点）の合計順</p>
           {overall.length === 0 ? (
             <EmptyState />
           ) : (
@@ -133,42 +131,6 @@ export default function FriendRankingPage() {
   );
 }
 
-function OverallCard({ e, myNick }: { e: OverallEntry; myNick: string | null }) {
-  const isMe = e.nickname === myNick;
-  return (
-    <div className={`card p-4 flex items-center gap-4 transition-all ${
-      isMe ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
-    }`}>
-      <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
-        {medal(e.rank)}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-white truncate">{e.nickname}</span>
-          {isMe && (
-            <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
-          )}
-        </div>
-        <div className="flex gap-3 mt-1 flex-wrap">
-          {GAME_IDS.map((gid) =>
-            e.details[gid] !== undefined ? (
-              <span key={gid} className="text-xs text-[#64748b]">
-                {GAME_META[gid].label.replace("テスト", "").replace("ゲーム", "")}:{" "}
-                <span className="text-white">{e.details[gid]}{GAME_META[gid].unit}</span>
-              </span>
-            ) : null
-          )}
-        </div>
-      </div>
-      <div className="text-right">
-        <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
-        <p className="text-[#64748b] text-xs">/ 100点</p>
-        <p className="text-[#64748b] text-xs mt-0.5">{e.gamesPlayed}/5種目</p>
-      </div>
-    </div>
-  );
-}
-
 function GameCard({
   e, myNick, unit, gameId,
 }: {
@@ -202,6 +164,46 @@ function GameCard({
           {calcGamePoints(gameId, e.score)}
           <span className="text-xs text-[#64748b] ml-0.5">pt</span>
         </p>
+      </div>
+    </div>
+  );
+}
+
+function OverallCard({
+  e, myNick,
+}: {
+  e: OverallEntry; myNick: string | null;
+}) {
+  const isMe = e.nickname === myNick;
+  return (
+    <div className={`card p-4 flex items-center gap-4 transition-all ${
+      isMe ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
+    }`}>
+      <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
+        {medal(e.rank)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-white truncate">{e.nickname}</span>
+          {isMe && (
+            <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
+          )}
+        </div>
+        <div className="flex gap-3 mt-1 flex-wrap">
+          {GAME_IDS.map((gid) =>
+            e.details[gid] !== undefined ? (
+              <span key={gid} className="text-xs text-[#64748b]">
+                {GAME_META[gid].label}:{" "}
+                <span className="text-white">{calcGamePoints(gid, e.details[gid]!)}pt</span>
+                <span className="text-[#64748b]">({e.details[gid]}{GAME_META[gid].unit})</span>
+              </span>
+            ) : null
+          )}
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
+        <p className="text-[#64748b] text-xs">pt（{e.gamesPlayed}種目）</p>
       </div>
     </div>
   );

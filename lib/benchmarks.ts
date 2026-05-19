@@ -53,6 +53,38 @@ const BENCHMARKS: Record<GameId, Record<AgeGroup, number>> = {
     "50代":   8,
     "60代以上": 6,
   },
+  "n-back": {
+    "10代":   55,
+    "20代":   60,
+    "30代":   55,
+    "40代":   50,
+    "50代":   40,
+    "60代以上": 30,
+  },
+  "dual-task": {
+    "10代":   38,
+    "20代":   40,
+    "30代":   38,
+    "40代":   34,
+    "50代":   28,
+    "60代以上": 22,
+  },
+  "trail-making": {
+    "10代":   650,
+    "20代":   600,
+    "30代":   560,
+    "40代":   500,
+    "50代":   420,
+    "60代以上": 330,
+  },
+  "mental-rotation": {
+    "10代":   15,
+    "20代":   16,
+    "30代":   15,
+    "40代":   13,
+    "50代":   11,
+    "60代以上": 9,
+  },
 };
 
 export function getBenchmark(gameId: GameId, age: number): { ageGroup: AgeGroup; average: number } {

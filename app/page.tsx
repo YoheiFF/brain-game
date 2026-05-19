@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAllPersonalBests, type GameId, GAME_IDS } from "@/lib/scores";
-import { calcGamePoints, calcTotalPoints } from "@/lib/game-points";
+import { calcGamePoints } from "@/lib/game-points";
 import { getNickname, hasNickname, getAge, getUserId } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
 import { getBenchmark } from "@/lib/benchmarks";
@@ -23,6 +23,10 @@ const GAMES: {
   { id: "stroop",         title: "ストループ", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "個" },
   { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "ms", lowerIsBetter: true },
   { id: "pattern",        title: "図形記憶",       description: "光ったマスのパターンを記憶せよ", icon: "🧩", color: "from-green-600 to-teal-600",    unit: "個" },
+  { id: "n-back",          title: "Nバック課題",      description: "N個前と同じ数字か判断せよ！",      icon: "🔄", color: "from-indigo-600 to-blue-700",   unit: "点" },
+  { id: "dual-task",       title: "注意分割タスク",    description: "左右の刺激に同時に反応しよう",      icon: "👁", color: "from-cyan-600 to-teal-600",     unit: "問" },
+  { id: "trail-making",    title: "トレイルメイキング", description: "数字を順番にタップせよ！",          icon: "✏️", color: "from-orange-500 to-red-600",    unit: "点" },
+  { id: "mental-rotation", title: "心的回転",          description: "図形が同じか鏡像かを判断しよう",    icon: "🔃", color: "from-emerald-500 to-green-700", unit: "点" },
 ];
 
 export default function Home() {
@@ -136,29 +140,6 @@ export default function Home() {
           )}
         </Link>
       </div>
-
-      {/* 合計ポイント */}
-      {Object.keys(bests).length > 0 && (() => {
-        const total = calcTotalPoints(bests)
-        const pct = Math.round((total / 100) * 100)
-        return (
-          <div className="card p-4 mb-6 animate-fade-in">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[#64748b] text-sm font-bold">🎯 総合ポイント</span>
-              <span className="text-white font-black text-lg">
-                {total}
-                <span className="text-[#64748b] text-sm font-normal"> / 100点</span>
-              </span>
-            </div>
-            <div className="w-full bg-[#0f0f1a] rounded-full h-2">
-              <div
-                className="h-2 rounded-full bg-gradient-to-r from-[#6c63ff] to-purple-400 transition-all duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )
-      })()}
 
       {/* ゲームカード */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

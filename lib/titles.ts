@@ -57,10 +57,11 @@ const TITLE_DEFS: TitleDef[] = [
     id: "all_clear",
     name: "全種目制覇",
     icon: "🏆",
-    description: "全5種目をプレイ",
+    description: "全9種目をプレイ",
     rarity: "normal",
     condition: (b) =>
-      (["calculation", "memory-number", "stroop", "reaction", "pattern"] as GameId[]).every(
+      (["calculation", "memory-number", "stroop", "reaction", "pattern",
+        "n-back", "dual-task", "trail-making", "mental-rotation"] as GameId[]).every(
         (id) => b[id] !== undefined
       ),
   },
@@ -84,6 +85,38 @@ const TITLE_DEFS: TitleDef[] = [
     description: "合計10回以上プレイ",
     rarity: "normal",
     condition: (_, totalPlays) => totalPlays >= 10,
+  },
+  {
+    id: "nback_master",
+    name: "記憶の番人",
+    icon: "🔄",
+    description: "Nバック課題で100点以上獲得",
+    rarity: "rare" as const,
+    condition: (b: Partial<Record<GameId, number>>) => (b["n-back"] ?? 0) >= 100,
+  },
+  {
+    id: "dual_master",
+    name: "マルチタスカー",
+    icon: "👁",
+    description: "注意分割タスクで40問以上正解",
+    rarity: "rare" as const,
+    condition: (b: Partial<Record<GameId, number>>) => (b["dual-task"] ?? 0) >= 40,
+  },
+  {
+    id: "trail_master",
+    name: "迅速な思考",
+    icon: "✏️",
+    description: "トレイルメイキングで700点以上獲得",
+    rarity: "rare" as const,
+    condition: (b: Partial<Record<GameId, number>>) => (b["trail-making"] ?? 0) >= 700,
+  },
+  {
+    id: "rotation_master",
+    name: "空間の覇者",
+    icon: "🔃",
+    description: "心的回転で150点以上獲得",
+    rarity: "epic" as const,
+    condition: (b: Partial<Record<GameId, number>>) => (b["mental-rotation"] ?? 0) >= 150,
   },
 ]
 

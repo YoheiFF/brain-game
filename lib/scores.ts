@@ -1,4 +1,5 @@
-export type GameId = "calculation" | "memory-number" | "stroop" | "reaction" | "pattern";
+export type GameId = "calculation" | "memory-number" | "stroop" | "reaction" | "pattern"
+  | "n-back" | "dual-task" | "trail-making" | "mental-rotation";
 
 export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBetter?: boolean }> = {
   calculation:   { label: "計算ゲーム",     unit: "問" },
@@ -6,6 +7,10 @@ export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBet
   stroop:        { label: "ストループテスト", unit: "個" },
   reaction:      { label: "反応速度テスト",  unit: "ms", lowerIsBetter: true },
   pattern:       { label: "図形記憶",       unit: "個" },
+  "n-back":           { label: "Nバック課題",     unit: "点" },
+  "dual-task":        { label: "注意分割タスク",   unit: "問" },
+  "trail-making":     { label: "トレイルメイキング", unit: "点" },
+  "mental-rotation":  { label: "心的回転",         unit: "問" },
 };
 
 export const GAME_IDS = Object.keys(GAME_META) as GameId[];
@@ -137,7 +142,7 @@ export function getGameRanking(gameId: GameId): RankEntry[] {
     .map((e, i) => ({ rank: i + 1, nickname: e.nickname, score: e.score, date: e.date }));
 }
 
-// ── 総合ランキング ─────────────────────────────────────
+// ── 総合ランキング（廃止済み・互換性のため型定義のみ残す） ──────────
 
 export interface OverallEntry {
   rank: number;
@@ -147,72 +152,9 @@ export interface OverallEntry {
   details: Partial<Record<GameId, number>>;
 }
 
-// game-points.ts と同じ基準値（20代平均スコア）
-// 循環インポートを避けるため scores.ts 内に定義
-const POINTS_REF: Record<GameId, number> = {
-  calculation: 17,
-  "memory-number": 8,
-  stroop: 23,
-  reaction: 220,
-  pattern: 18,
-};
-
-/**
- * 総合ランキング
- * 各種目のベストスコアを20代平均基準で1〜20点に換算して合算。
- * TOP画面の calcTotalPoints と同方式で最大100点。
- */
+/** @deprecated 総合ポイント廃止 */
 export function getOverallRanking(): OverallEntry[] {
-  const rankings = loadRankings();
-
-  // 全ニックネームとゲームごとのベストを収集
-  const playerBests = new Map<string, Partial<Record<GameId, number>>>();
-
-  for (const gameId of GAME_IDS) {
-    const list = rankings[gameId] ?? [];
-    const { lowerIsBetter } = GAME_META[gameId];
-    const bestMap = new Map<string, number>();
-    for (const e of list) {
-      const prev = bestMap.get(e.nickname);
-      if (prev === undefined) {
-        bestMap.set(e.nickname, e.score);
-      } else {
-        bestMap.set(e.nickname, lowerIsBetter ? Math.min(prev, e.score) : Math.max(prev, e.score));
-      }
-    }
-    for (const [nick, score] of bestMap.entries()) {
-      if (!playerBests.has(nick)) playerBests.set(nick, {});
-      playerBests.get(nick)![gameId] = score;
-    }
-  }
-
-  if (playerBests.size === 0) return [];
-
-  const entries: OverallEntry[] = [];
-  for (const [nickname, bests] of playerBests.entries()) {
-    let totalPoints = 0;
-    let gamesPlayed = 0;
-    for (const [gameId, score] of Object.entries(bests) as [GameId, number][]) {
-      if (score === undefined) continue;
-      gamesPlayed++;
-      const ref = POINTS_REF[gameId];
-      const { lowerIsBetter } = GAME_META[gameId];
-      const ratio = lowerIsBetter ? ref / score : score / ref;
-      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
-    }
-    entries.push({
-      rank: 0,
-      nickname,
-      totalPoints,
-      gamesPlayed,
-      details: bests,
-    });
-  }
-
-  return entries
-    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
-    .slice(0, 20)
-    .map((e, i) => ({ ...e, rank: i + 1 }));
+  return [];
 }
 
 /** 指定ニックネームの種目別ランク（全件検索）*/
@@ -240,49 +182,9 @@ export function getUserGameRankEntry(gameId: GameId, nickname: string): RankEntr
   return { rank: idx + 1, nickname: e.nickname, score: e.score, date: e.date };
 }
 
-/** 指定ニックネームの総合ランク（全件検索）*/
-export function getUserOverallRankEntry(nickname: string): OverallEntry | null {
-  const rankings = loadRankings();
-  const playerBests = new Map<string, Partial<Record<GameId, number>>>();
-
-  for (const gameId of GAME_IDS) {
-    const list = rankings[gameId] ?? [];
-    const { lowerIsBetter } = GAME_META[gameId];
-    const bestMap = new Map<string, number>();
-    for (const e of list) {
-      const prev = bestMap.get(e.nickname);
-      if (prev === undefined) {
-        bestMap.set(e.nickname, e.score);
-      } else {
-        bestMap.set(e.nickname, lowerIsBetter ? Math.min(prev, e.score) : Math.max(prev, e.score));
-      }
-    }
-    for (const [nick, score] of bestMap.entries()) {
-      if (!playerBests.has(nick)) playerBests.set(nick, {});
-      playerBests.get(nick)![gameId] = score;
-    }
-  }
-
-  const entries: OverallEntry[] = [];
-  for (const [nick, bests] of playerBests.entries()) {
-    let totalPoints = 0;
-    let gamesPlayed = 0;
-    for (const [gameId, score] of Object.entries(bests) as [GameId, number][]) {
-      if (score === undefined) continue;
-      gamesPlayed++;
-      const ref = POINTS_REF[gameId];
-      const { lowerIsBetter } = GAME_META[gameId];
-      const ratio = lowerIsBetter ? ref / score : score / ref;
-      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
-    }
-    entries.push({ rank: 0, nickname: nick, totalPoints, gamesPlayed, details: bests });
-  }
-
-  const sorted = entries
-    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
-    .map((e, i) => ({ ...e, rank: i + 1 }));
-
-  return sorted.find((e) => e.nickname === nickname) ?? null;
+/** @deprecated 総合ポイント廃止 */
+export function getUserOverallRankEntry(_nickname: string): OverallEntry | null {
+  return null;
 }
 
 /** 全ゲームの累計プレイ回数を返す */

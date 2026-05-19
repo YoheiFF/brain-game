@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   GAME_IDS, GAME_META, GameId,
-  getGameRanking, getOverallRanking,
-  getUserGameRankEntry, getUserOverallRankEntry,
   type RankEntry, type OverallEntry,
 } from "@/lib/scores";
 import { calcGamePoints } from "@/lib/game-points";
@@ -82,9 +80,8 @@ export default function RankingsPage() {
       {!loading && syncData && tab === "overall" && (
         <div className="animate-fade-in">
           <p className="text-[#64748b] text-xs mb-4">
-            各種目のスコアを20代平均基準で換算した合計点順（最大100点）
+            各ゲームポイント（20点満点）の合計順
           </p>
-
           {myOverallEntry && (
             <div className="mb-4">
               <p className="text-xs text-[#64748b] mb-2">あなたの順位</p>
@@ -92,7 +89,6 @@ export default function RankingsPage() {
               <div className="border-t border-[#2a2a4a] mt-4 mb-3" />
             </div>
           )}
-
           {overall.length === 0 ? (
             <EmptyState />
           ) : (
@@ -146,41 +142,6 @@ export default function RankingsPage() {
   );
 }
 
-function OverallCard({ e, myNick, isMe = false }: { e: OverallEntry; myNick: string | null; isMe?: boolean }) {
-  return (
-    <div className={`card p-4 flex items-center gap-4 transition-all ${
-      isMe || e.nickname === myNick ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
-    }`}>
-      <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
-        {medal(e.rank)}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-white truncate">{e.nickname}</span>
-          {(isMe || e.nickname === myNick) && (
-            <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
-          )}
-        </div>
-        <div className="flex gap-3 mt-1 flex-wrap">
-          {GAME_IDS.map((gid) =>
-            e.details[gid] !== undefined ? (
-              <span key={gid} className="text-xs text-[#64748b]">
-                {GAME_META[gid].label.replace("テスト", "").replace("ゲーム", "")}:{" "}
-                <span className="text-white">{e.details[gid]}{GAME_META[gid].unit}</span>
-              </span>
-            ) : null
-          )}
-        </div>
-      </div>
-      <div className="text-right">
-        <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
-        <p className="text-[#64748b] text-xs">/ 100点</p>
-        <p className="text-[#64748b] text-xs mt-0.5">{e.gamesPlayed}/5種目</p>
-      </div>
-    </div>
-  );
-}
-
 function GameCard({
   e, myNick, unit, gameId, isMe = false,
 }: {
@@ -213,6 +174,45 @@ function GameCard({
           {calcGamePoints(gameId, e.score)}
           <span className="text-xs text-[#64748b] ml-0.5">pt</span>
         </p>
+      </div>
+    </div>
+  );
+}
+
+function OverallCard({
+  e, myNick, isMe = false,
+}: {
+  e: OverallEntry; myNick: string | null; isMe?: boolean;
+}) {
+  return (
+    <div className={`card p-4 flex items-center gap-4 transition-all ${
+      isMe || e.nickname === myNick ? "border-[#6c63ff] bg-[#6c63ff]/5" : ""
+    }`}>
+      <span className={`text-2xl w-10 text-center font-black ${e.rank <= 3 ? "" : "text-[#64748b]"}`}>
+        {medal(e.rank)}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-white truncate">{e.nickname}</span>
+          {(isMe || e.nickname === myNick) && (
+            <span className="text-xs bg-[#6c63ff]/20 text-[#6c63ff] px-2 py-0.5 rounded-full">あなた</span>
+          )}
+        </div>
+        <div className="flex gap-3 mt-1 flex-wrap">
+          {GAME_IDS.map((gid) =>
+            e.details[gid] !== undefined ? (
+              <span key={gid} className="text-xs text-[#64748b]">
+                {GAME_META[gid].label}:{" "}
+                <span className="text-white">{calcGamePoints(gid, e.details[gid]!)}pt</span>
+                <span className="text-[#64748b]">({e.details[gid]}{GAME_META[gid].unit})</span>
+              </span>
+            ) : null
+          )}
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-2xl font-black text-[#6c63ff]">{e.totalPoints}</p>
+        <p className="text-[#64748b] text-xs">pt（{e.gamesPlayed}種目）</p>
       </div>
     </div>
   );

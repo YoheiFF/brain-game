@@ -5,7 +5,6 @@ import { getOrCreateUser, updateUser } from "@/lib/db-user";
 import {
   saveScoreToDb,
   recordDailyPlay,
-  updateDailyHistory,
 } from "@/lib/db-scores";
 import { getOrCreateFriendCode } from "@/lib/db-friends";
 import { GAME_IDS, GAME_META, type GameId } from "@/lib/scores";
@@ -33,6 +32,10 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   stroop:          { min: 0,  max: 60   },
   reaction:        { min: 50, max: 2000 },
   pattern:         { min: 0,  max: 25   },
+  "n-back":          { min: 0, max: 200  },
+  "dual-task":       { min: 0, max: 99   },
+  "trail-making":    { min: 0, max: 1000 },
+  "mental-rotation": { min: 0, max: 20   },
 };
 
 /** 1日あたりの同一ゲーム最大プレイ回数 */
@@ -136,7 +139,6 @@ export async function recordScore(input: RecordScoreInput): Promise<ActionResult
 
     await saveScoreToDb(input.userId, input.gameId, input.score);
     await recordDailyPlay(input.userId, input.gameId, input.score);
-    await updateDailyHistory(input.userId);
     revalidatePath("/rankings");
     return { success: true };
   } catch (e) {

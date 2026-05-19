@@ -1,15 +1,6 @@
 import { getDb } from "@/lib/db";
 import { GAME_META, GAME_IDS, type GameId, type RankEntry, type OverallEntry } from "@/lib/scores";
-import type { DailyHistoryEntry } from "@/lib/daily";
-
-// game-points.ts と同じ参照値（循環インポート回避）
-const POINTS_REF: Record<GameId, number> = {
-  calculation: 17,
-  "memory-number": 8,
-  stroop: 23,
-  reaction: 220,
-  pattern: 18,
-};
+import { calcGamePoints } from "@/lib/game-points";
 
 export async function saveScoreToDb(
   userId: string,
@@ -107,31 +98,16 @@ export async function getRankingsFromDb(): Promise<{
     }));
   }
 
-  // 総合ランキング計算
+  // 総合ランキング（ゲームポイント合計順）
   const overallEntries: OverallEntry[] = [];
   for (const [, { nickname, bests }] of userBests.entries()) {
-    let totalPoints = 0;
-    let gamesPlayed = 0;
-    for (const gameId of GAME_IDS) {
-      const score = bests[gameId];
-      if (score === undefined) continue;
-      gamesPlayed++;
-      const ref = POINTS_REF[gameId];
-      const { lowerIsBetter } = GAME_META[gameId];
-      const ratio = lowerIsBetter ? ref / score : score / ref;
-      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
-    }
-    overallEntries.push({
-      rank: 0,
-      nickname,
-      totalPoints,
-      gamesPlayed,
-      details: bests,
-    });
+    const gamesPlayed = Object.keys(bests).length;
+    const totalPoints = (Object.entries(bests) as [GameId, number][])
+      .reduce((sum, [gid, score]) => sum + calcGamePoints(gid, score), 0);
+    overallEntries.push({ rank: 0, nickname, totalPoints, gamesPlayed, details: bests });
   }
-
   const overallRanking = overallEntries
-    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
+    .sort((a, b) => b.totalPoints - a.totalPoints)
     .slice(0, 20)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 
@@ -190,24 +166,14 @@ export async function getUserRanksFromDb(userId: string): Promise<{
   // 総合: 全件ソートして自分の順位を特定
   const overallEntries: Array<OverallEntry & { userId: string }> = [];
   for (const [uid, { nickname, bests }] of userBests.entries()) {
-    let totalPoints = 0;
-    let gamesPlayed = 0;
-    for (const gameId of GAME_IDS) {
-      const score = bests[gameId];
-      if (score === undefined) continue;
-      gamesPlayed++;
-      const ref = POINTS_REF[gameId];
-      const { lowerIsBetter } = GAME_META[gameId];
-      const ratio = lowerIsBetter ? ref / score : score / ref;
-      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
-    }
+    const gamesPlayed = Object.keys(bests).length;
+    const totalPoints = (Object.entries(bests) as [GameId, number][])
+      .reduce((sum, [gid, score]) => sum + calcGamePoints(gid, score), 0);
     overallEntries.push({ userId: uid, rank: 0, nickname, totalPoints, gamesPlayed, details: bests });
   }
-
   const sortedOverall = overallEntries
-    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
+    .sort((a, b) => b.totalPoints - a.totalPoints)
     .map((e, i) => ({ ...e, rank: i + 1 }));
-
   const myOverall = sortedOverall.find((e) => e.userId === userId);
   const overallRank: OverallEntry | null = myOverall
     ? { rank: myOverall.rank, nickname: myOverall.nickname, totalPoints: myOverall.totalPoints, gamesPlayed: myOverall.gamesPlayed, details: myOverall.details }
@@ -284,31 +250,16 @@ export async function getFriendRankingsFromDb(
     }));
   }
 
-  // 総合ランキング計算
+  // 総合ランキング（ゲームポイント合計順）
   const overallEntries: OverallEntry[] = [];
   for (const [, { nickname, bests }] of userBests.entries()) {
-    let totalPoints = 0;
-    let gamesPlayed = 0;
-    for (const gameId of GAME_IDS) {
-      const score = bests[gameId];
-      if (score === undefined) continue;
-      gamesPlayed++;
-      const ref = POINTS_REF[gameId];
-      const { lowerIsBetter } = GAME_META[gameId];
-      const ratio = lowerIsBetter ? ref / score : score / ref;
-      totalPoints += Math.min(20, Math.max(1, Math.round(ratio * 10)));
-    }
-    overallEntries.push({
-      rank: 0,
-      nickname,
-      totalPoints,
-      gamesPlayed,
-      details: bests,
-    });
+    const gamesPlayed = Object.keys(bests).length;
+    const totalPoints = (Object.entries(bests) as [GameId, number][])
+      .reduce((sum, [gid, score]) => sum + calcGamePoints(gid, score), 0);
+    overallEntries.push({ rank: 0, nickname, totalPoints, gamesPlayed, details: bests });
   }
-
   const overallRanking = overallEntries
-    .sort((a, b) => b.totalPoints - a.totalPoints || b.gamesPlayed - a.gamesPlayed)
+    .sort((a, b) => b.totalPoints - a.totalPoints)
     .slice(0, 20)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 
@@ -353,38 +304,6 @@ export async function recordDailyPlay(
   return { playCount: newPlayCount, bestScore: newBest };
 }
 
-export async function updateDailyHistory(userId: string): Promise<void> {
-  const db = await getDb();
-  const today = new Date().toISOString().slice(0, 10);
-
-  const result = await db.execute({
-    sql: "SELECT game_id, best_score FROM daily_plays WHERE user_id = ? AND play_date = ?",
-    args: [userId, today],
-  });
-
-  let totalPoints = 0;
-  let gamesPlayed = 0;
-
-  for (const row of result.rows) {
-    const gameId = row.game_id as GameId;
-    if (!GAME_IDS.includes(gameId)) continue;
-    const bestScore = row.best_score as number | null;
-    if (bestScore === null) continue;
-    gamesPlayed++;
-    const ref = POINTS_REF[gameId];
-    const { lowerIsBetter } = GAME_META[gameId];
-    const ratio = lowerIsBetter ? ref / bestScore : bestScore / ref;
-    totalPoints += Math.min(100, Math.round(ratio * 50));
-  }
-
-  await db.execute({
-    sql: `INSERT INTO daily_history (user_id, play_date, total_points, games_played)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT (user_id, play_date)
-          DO UPDATE SET total_points = ?, games_played = ?`,
-    args: [userId, today, totalPoints, gamesPlayed, totalPoints, gamesPlayed],
-  });
-}
 
 export async function getDailyPlaysFromDb(
   userId: string
@@ -409,27 +328,3 @@ export async function getDailyPlaysFromDb(
   return dailyPlays;
 }
 
-export async function getDailyHistoryFromDb(
-  userId: string,
-  days: number
-): Promise<DailyHistoryEntry[]> {
-  const db = await getDb();
-
-  const result = await db.execute({
-    sql: `SELECT play_date, total_points, games_played
-          FROM daily_history
-          WHERE user_id = ?
-          ORDER BY play_date DESC
-          LIMIT ?`,
-    args: [userId, days],
-  });
-
-  // 降順 → 昇順に反転
-  const rows = [...result.rows].reverse();
-
-  return rows.map((row) => ({
-    date: row.play_date as string,
-    totalPoints: row.total_points as number,
-    gamesPlayed: row.games_played as number,
-  }));
-}

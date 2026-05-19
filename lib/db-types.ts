@@ -1,8 +1,7 @@
 import type { GameId } from "@/lib/scores";
 import type { RankEntry, OverallEntry } from "@/lib/scores";
-import type { DailyHistoryEntry } from "@/lib/daily";
 
-export type { GameId, RankEntry, OverallEntry, DailyHistoryEntry };
+export type { GameId, RankEntry, OverallEntry };
 
 // ユーザー
 export interface User {
@@ -31,21 +30,13 @@ export interface DailyPlay {
   bestScore: number | null;
 }
 
-// デイリー履歴
-export interface DailyHistoryRecord {
-  userId: string;
-  playDate: string;      // "YYYY-MM-DD"
-  totalPoints: number;
-  gamesPlayed: number;
-}
-
 // /api/sync レスポンス全体
 export interface SyncResponse {
   personalBests: Partial<Record<GameId, number>>;
   gameRankings: Partial<Record<GameId, RankEntry[]>>;
   overallRanking: OverallEntry[];
   dailyPlays: Partial<Record<GameId, { playCount: number; bestScore: number | null }>>;
-  dailyHistory: DailyHistoryEntry[];
+  dailyHistory: never[];
   myGameRanks: Partial<Record<GameId, RankEntry>>;
   myOverallRank: OverallEntry | null;
 }

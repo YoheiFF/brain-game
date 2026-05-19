@@ -3,7 +3,6 @@ import { getDb } from "@/lib/db";
 import {
   saveScoreToDb,
   recordDailyPlay,
-  updateDailyHistory,
 } from "@/lib/db-scores";
 import { GAME_IDS, type GameId } from "@/lib/scores";
 
@@ -17,6 +16,10 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   stroop:          { min: 0,  max: 60   },
   reaction:        { min: 50, max: 2000 },
   pattern:         { min: 0,  max: 25   },
+  "n-back":          { min: 0, max: 200  },
+  "dual-task":       { min: 0, max: 99   },
+  "trail-making":    { min: 0, max: 1000 },
+  "mental-rotation": { min: 0, max: 20   },
 };
 
 const MAX_PLAYS_PER_DAY = 6; // 3 base + 3 rewarded
@@ -126,7 +129,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // DB 書き込み
     await saveScoreToDb(userId, validGameId, score);
     await recordDailyPlay(userId, validGameId, score);
-    await updateDailyHistory(userId);
 
     return NextResponse.json(
       { success: true },

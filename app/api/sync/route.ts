@@ -4,7 +4,6 @@ import {
   getRankingsFromDb,
   getUserRanksFromDb,
   getDailyPlaysFromDb,
-  getDailyHistoryFromDb,
 } from "@/lib/db-scores";
 import type { SyncResponse } from "@/lib/db-types";
 
@@ -53,13 +52,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const [personalBests, rankings, myRanks, dailyPlays, dailyHistory] =
+    const [personalBests, rankings, myRanks, dailyPlays] =
       await Promise.all([
         getPersonalBestsFromDb(userId),
         getRankingsFromDb(),
         getUserRanksFromDb(userId),
         getDailyPlaysFromDb(userId),
-        getDailyHistoryFromDb(userId, 14),
       ]);
 
     const body: SyncResponse = {
@@ -69,7 +67,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       myGameRanks: myRanks.gameRanks,
       myOverallRank: myRanks.overallRank,
       dailyPlays,
-      dailyHistory,
+      dailyHistory: [],
     };
 
     return NextResponse.json(body, {

@@ -4,11 +4,10 @@ import Link from "next/link"
 import { getAllPersonalBests, getTotalPlayCount, type GameId } from "@/lib/scores"
 import { getAge } from "@/lib/nickname"
 import { calcBrainAge } from "@/lib/brain-age"
-import { getRadarData, getBrainType, type CognitiveSkill } from "@/lib/brain-type"
+import { getRadarData, getBrainType, SKILL_GAMES, type CognitiveSkill } from "@/lib/brain-type"
 import { getAllTitles } from "@/lib/titles"
-import { getDailyHistory, getDailyBests } from "@/lib/daily"
+import { getDailyBests } from "@/lib/daily"
 import RadarChart from "@/components/RadarChart"
-import MiniBarChart from "@/components/MiniBarChart"
 import { useDbSync } from "@/hooks/useDbSync"
 
 type Tab = "today" | "alltime"
@@ -55,8 +54,7 @@ export default function StatsPage() {
   const radarData = getRadarData(currentBests)
   const brainType = getBrainType(radarData)
   const titles = getAllTitles(bests, totalPlays)
-  const history = getDailyHistory(14)
-  const hasData = Object.keys(bests).length > 0
+const hasData = Object.keys(bests).length > 0
   const hasTodayData = Object.keys(dailyBests).length > 0
 
   return (
@@ -140,8 +138,35 @@ export default function StatsPage() {
                   <RadarChart data={radarData as Record<CognitiveSkill, number | null>} size={240} />
                 </div>
                 <p className="text-[#3a3a6a] text-xs mt-2 text-center">
-                  ※ 20代平均スコアを50として換算
+                  ※ ゲームポイント20点満点を100として換算
                 </p>
+                {(() => {
+                  const entries = Object.entries(radarData) as [CognitiveSkill, number | null][]
+                  const unplayed = entries.filter(([, v]) => v === null)
+                  const played = entries.filter(([, v]) => v !== null) as [CognitiveSkill, number][]
+                  const target: CognitiveSkill | null =
+                    unplayed.length > 0
+                      ? unplayed[0][0]
+                      : played.length > 0
+                      ? [...played].sort((a, b) => a[1] - b[1])[0][0]
+                      : null
+                  if (!target) return null
+                  const games = SKILL_GAMES[target]
+                  const isUnplayed = unplayed.some(([s]) => s === target)
+                  return (
+                    <div className="mt-4 p-3 bg-[#0f0f1e] rounded-xl border border-[#2a2a4a]">
+                      <p className="text-xs text-[#64748b] mb-1">
+                        💡 {isUnplayed ? "まだ計測していない認知能力があります" : "最も伸びしろのある認知能力"}
+                      </p>
+                      <p className="text-sm text-white">
+                        <span className="text-[#6c63ff] font-bold">{target}</span>を鍛えよう！
+                      </p>
+                      <p className="text-xs text-[#64748b] mt-1">
+                        おすすめ：{games.map((g) => g.title).join(" / ")}
+                      </p>
+                    </div>
+                  )
+                })()}
               </>
             )}
           </section>
@@ -172,14 +197,6 @@ export default function StatsPage() {
             </div>
           </section>
 
-          {/* 成長グラフ */}
-          <section className="card p-6">
-            <h2 className="text-lg font-bold text-white mb-1">📈 成長グラフ（直近14日）</h2>
-            <p className="text-[#64748b] text-xs mb-4">
-              1日の合計ポイント推移（今日の分は紫）
-            </p>
-            <MiniBarChart data={history} height={80} />
-          </section>
 
         </div>
       )}

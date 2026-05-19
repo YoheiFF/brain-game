@@ -8,6 +8,10 @@ const REFERENCE: Record<GameId, number> = {
   stroop: 18,
   reaction: 250,
   pattern: 12,
+  "n-back":          60,
+  "dual-task":       40,
+  "trail-making":    600,
+  "mental-rotation": 15,
 }
 
 /** ゲームの生スコアを 1〜20 点に換算する */
