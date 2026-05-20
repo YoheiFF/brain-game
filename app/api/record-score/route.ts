@@ -19,7 +19,7 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   "n-back":          { min: 0, max: 200  },
   "dual-task":       { min: 0, max: 99   },
   "trail-making":    { min: 0, max: 1000 },
-  "mental-rotation": { min: 0, max: 20   },
+  "mental-rotation": { min: 0, max: 200  },
 };
 
 const MAX_PLAYS_PER_DAY = 6; // 3 base + 3 rewarded

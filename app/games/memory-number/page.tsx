@@ -17,6 +17,7 @@ function generateSequence(length: number): number[] {
 }
 
 const SHOW_MS_PER_DIGIT = 600;
+const MAX_LEVEL = 20;
 
 export default function MemoryNumberGame() {
   const router = useRouter();
@@ -113,11 +114,24 @@ export default function MemoryNumberGame() {
     const correct = sequence.join("");
     if (input === correct) {
       setPhase("correct");
-      setTimeout(() => {
-        const next = level + 1;
-        setLevel(next);
-        startRound(next);
-      }, 800);
+      if (level >= MAX_LEVEL) {
+        setTimeout(() => {
+          if (gameEndedRef.current) return;
+          gameEndedRef.current = true;
+          const newBest = saveScore("memory-number", MAX_LEVEL, getNickname() ?? "ゲスト", getOrInitUserId());
+          recordPlay("memory-number", MAX_LEVEL);
+          setRemaining(getRemainingPlays("memory-number"));
+          setBest(newBest);
+          setIsNewBest(newBest === MAX_LEVEL);
+          setPhase("result");
+        }, 800);
+      } else {
+        setTimeout(() => {
+          const next = level + 1;
+          setLevel(next);
+          startRound(next);
+        }, 800);
+      }
     } else {
       setPhase("wrong");
       setTimeout(() => {

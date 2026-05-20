@@ -68,6 +68,16 @@ export default function NBackGame() {
     return result;
   }
 
+  function countOpportunities(stimuli: number[], nLevel: number): number {
+    let count = 0;
+    for (let i = nLevel; i < stimuli.length; i++) {
+      if (stimuli[i] === stimuli[i - nLevel]) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   const saveScoreAndFinish = useCallback((finalScore: number) => {
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
@@ -81,7 +91,10 @@ export default function NBackGame() {
 
   const endRound = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const finalScore = hitsRef.current * N_LEVEL * 10;
+    const opportunities = countOpportunities(stimuliRef.current, N_LEVEL);
+    const finalScore = opportunities === 0
+      ? 0
+      : Math.round((hitsRef.current / opportunities) * 200);
     scoreRef.current = finalScore;
     setScore(finalScore);
     saveScoreAndFinish(finalScore);
