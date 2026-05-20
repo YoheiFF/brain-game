@@ -121,8 +121,6 @@ export default function MentalRotationGame() {
 
   const startQuestionTimer = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
-    questionNumRef.current++;
-    setQuestionNum(questionNumRef.current);
     answeredRef.current = false;
     questionStartRef.current = Date.now();
     setTimeProgress(100);
@@ -145,6 +143,8 @@ export default function MentalRotationGame() {
           if (questionNumRef.current >= TOTAL_QUESTIONS) {
             endGame();
           } else {
+            questionNumRef.current++;
+            setQuestionNum(questionNumRef.current);
             applyNextQuestion();
             setPhase("playing");
           }
@@ -155,15 +155,15 @@ export default function MentalRotationGame() {
 
   useEffect(() => {
     if (phase === "playing") startQuestionTimer();
-  }, [phase, currentShape, startQuestionTimer]);
+  }, [phase, startQuestionTimer]);
 
   const startGame = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     correctCountRef.current = 0;
-    questionNumRef.current = 0;
+    questionNumRef.current = 1;
     deckRef.current = [];
     setCorrectCount(0);
-    setQuestionNum(0);
+    setQuestionNum(1);
     setScore(0);
     setLastVerdict(null);
     setIsNewBest(false);
@@ -192,6 +192,8 @@ export default function MentalRotationGame() {
       if (questionNumRef.current >= TOTAL_QUESTIONS) {
         endGame();
       } else {
+        questionNumRef.current++;
+        setQuestionNum(questionNumRef.current);
         nextQuestion();
         setPhase("playing");
       }
