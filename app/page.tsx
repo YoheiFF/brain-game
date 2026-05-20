@@ -99,7 +99,6 @@ export default function Home() {
         </div>
         {nickname && (
           <div className="flex items-center gap-2">
-            <span className="text-[#64748b] text-xs">プレイヤー</span>
             <span className="text-white font-bold text-sm bg-[#1a1a2e] border border-[#2a2a4a] px-3 py-1 rounded-full">
               {nickname}{age !== null ? ` (${age}歳)` : ""}
             </span>
