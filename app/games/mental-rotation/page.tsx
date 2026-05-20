@@ -16,7 +16,7 @@ type Verdict = "same" | "mirror";
 const GAME_ID = "mental-rotation" as const;
 const TOTAL_QUESTIONS = 20;
 const FEEDBACK_DURATION_MS = 500;
-const QUESTION_TIME_MS = 3000;
+const QUESTION_TIME_MS = 2000;
 const ROTATIONS = [0, 45, 90, 135, 180, 225, 270, 315];
 
 const SHAPES: { id: number; points: string }[] = [
@@ -32,6 +32,10 @@ const SHAPES: { id: number; points: string }[] = [
   { id: 5, points: "15,15 15,85 45,85 45,45 75,45 75,15 15,15" },
   // 短L字（左太棒＋右低足）
   { id: 6, points: "20,20 20,80 60,80 60,60 40,60 40,20 20,20" },
+  // F字（縦棒＋上腕＋中腕、非対称）
+  { id: 7, points: "10,10 80,10 80,30 30,30 30,45 65,45 65,65 30,65 30,90 10,90 10,10" },
+  // Z字（上右ブロック＋下左ブロック、非対称）
+  { id: 8, points: "40,10 85,10 85,40 60,40 60,90 15,90 15,60 40,60 40,10" },
 ];
 
 export default function MentalRotationGame() {
@@ -197,7 +201,7 @@ export default function MentalRotationGame() {
             <div className="text-6xl">🔃</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>図形が<span className="text-white font-bold">同じ向き</span>か<span className="text-white font-bold">鏡像</span>かを判断してください</p>
-              <p>回答時間: <span className="text-white font-bold">3秒</span></p>
+              <p>回答時間: <span className="text-white font-bold">2秒</span></p>
               <p>全<span className="text-white font-bold">{TOTAL_QUESTIONS}問</span>中何問正解できるか！</p>
               {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}点</span></p>}
             </div>
