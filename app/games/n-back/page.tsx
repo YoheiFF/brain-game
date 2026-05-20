@@ -10,35 +10,37 @@ import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining 
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 
-type Phase = "ready" | "playing" | "feedback" | "result";
+type Phase = "ready" | "playing" | "result";
 
 const GAME_ID = "n-back" as const;
 const N_LEVEL = 2;
-const STIMULI_PER_ROUND = 20;
+const TOTAL_ROUNDS = 10;
 const INTERVAL_MS = 1500;
-const FEEDBACK_MS = 400;
 
 export default function NBackGame() {
   const router = useRouter();
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
-  const [stimuli, setStimuli] = useState<number[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number>(-1);
+  const [currentNumber, setCurrentNumber] = useState<number | null>(null);
   const [score, setScore] = useState<number>(0);
+  const [correctCount, setCorrectCount] = useState<number>(0);
+  const [missCount, setMissCount] = useState<number>(0);
+  const [feedbackType, setFeedbackType] = useState<"hit" | "miss" | null>(null);
+  const [responded, setResponded] = useState<boolean>(false);
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [rewardedRemaining, setRewardedRemaining] = useState(0);
-  const [feedbackType, setFeedbackType] = useState<"hit" | "miss" | null>(null);
-  const [responded, setResponded] = useState<boolean>(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const stimuliRef = useRef<number[]>([]);
-  const indexRef = useRef<number>(-1);
+  const historyRef = useRef<number[]>([]);
+  const currentIsMatchRef = useRef<boolean>(false);
   const respondedRef = useRef<boolean>(false);
-  const hitsRef = useRef<number>(0);
-  const scoreRef = useRef<number>(0);
+  const correctRef = useRef<number>(0);
+  const missRef = useRef<number>(0);
+  const phaseRef = useRef<Phase>("ready");
+  const gameEndedRef = useRef<boolean>(false);
 
   useEffect(() => {
     setBest(getPersonalBest(GAME_ID));
@@ -49,6 +51,7 @@ export default function NBackGame() {
   useEffect(() => {
     if (phase === "ready" || phase === "result") resume();
     else pause();
+    phaseRef.current = phase;
   }, [phase, pause, resume]);
 
   useEffect(() => {
@@ -58,27 +61,34 @@ export default function NBackGame() {
     };
   }, [resume]);
 
-  function generateStimuli(count: number): number[] {
-    const result: number[] = [];
-    for (let i = 0; i < count; i++) {
+  // 次の刺激を生成（50%でマッチ、即時繰り返しなし）
+  function nextStimulus(history: number[]): { num: number; isMatch: boolean } {
+    const prev = history[history.length - 1];
+
+    if (history.length < N_LEVEL) {
       let n: number;
-      do { n = Math.floor(Math.random() * 9) + 1; } while (n === result[i - 1]);
-      result.push(n);
+      do { n = Math.floor(Math.random() * 9) + 1; } while (n === prev);
+      return { num: n, isMatch: false };
     }
-    return result;
+
+    const nBack = history[history.length - N_LEVEL];
+
+    // 50%でマッチ（即時繰り返しにならない場合のみ）
+    if (Math.random() < 0.5 && nBack !== prev) {
+      return { num: nBack, isMatch: true };
+    }
+
+    // ノンマッチ: prev と nBack 両方を避ける
+    let n: number;
+    do { n = Math.floor(Math.random() * 9) + 1; } while (n === prev || n === nBack);
+    return { num: n, isMatch: false };
   }
 
-  function countOpportunities(stimuli: number[], nLevel: number): number {
-    let count = 0;
-    for (let i = nLevel; i < stimuli.length; i++) {
-      if (stimuli[i] === stimuli[i - nLevel]) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  const saveScoreAndFinish = useCallback((finalScore: number) => {
+  const endGame = useCallback(() => {
+    if (gameEndedRef.current) return;
+    gameEndedRef.current = true;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const finalScore = correctRef.current * 2;
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const newBest = saveScore(GAME_ID, finalScore, nickname, userId);
@@ -86,73 +96,71 @@ export default function NBackGame() {
     setRemaining(getRemainingPlays(GAME_ID));
     setBest(newBest);
     setIsNewBest(newBest === finalScore && finalScore > 0);
+    setScore(finalScore);
     setPhase("result");
   }, []);
 
-  const endRound = useCallback(() => {
+  const startGame = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const opportunities = countOpportunities(stimuliRef.current, N_LEVEL);
-    const finalScore = opportunities === 0
-      ? 0
-      : Math.round((hitsRef.current / opportunities) * 200);
-    scoreRef.current = finalScore;
-    setScore(finalScore);
-    saveScoreAndFinish(finalScore);
-  }, [saveScoreAndFinish]);
-
-  const startRound = useCallback(() => {
-    const newStimuli = generateStimuli(STIMULI_PER_ROUND);
-    stimuliRef.current = newStimuli;
-    setStimuli(newStimuli);
-    hitsRef.current = 0;
-    indexRef.current = -1;
+    gameEndedRef.current = false;
+    historyRef.current = [];
+    currentIsMatchRef.current = false;
     respondedRef.current = false;
-    setCurrentIndex(-1);
-    setResponded(false);
+    correctRef.current = 0;
+    missRef.current = 0;
+
+    setCurrentNumber(null);
+    setScore(0);
+    setCorrectCount(0);
+    setMissCount(0);
     setFeedbackType(null);
+    setResponded(false);
+    setIsNewBest(false);
     setPhase("playing");
 
     intervalRef.current = setInterval(() => {
-      indexRef.current++;
-      const idx = indexRef.current;
-      setCurrentIndex(idx);
-      respondedRef.current = false;
-      setResponded(false);
+      if (gameEndedRef.current) return;
 
-      if (idx >= STIMULI_PER_ROUND) {
-        clearInterval(intervalRef.current!);
-        endRound();
+      // 前の刺激がマッチで未回答 → 見逃し
+      if (currentIsMatchRef.current && !respondedRef.current && historyRef.current.length >= N_LEVEL) {
+        missRef.current++;
+        setMissCount(missRef.current);
+        if (correctRef.current + missRef.current >= TOTAL_ROUNDS) {
+          endGame(); return;
+        }
       }
+
+      const { num, isMatch } = nextStimulus(historyRef.current);
+      historyRef.current.push(num);
+      currentIsMatchRef.current = isMatch;
+      respondedRef.current = false;
+      setCurrentNumber(num);
+      setResponded(false);
+      setFeedbackType(null);
     }, INTERVAL_MS);
-  }, [endRound]);
+  }, [endGame]);
 
   const handleSameButton = useCallback(() => {
+    if (phaseRef.current !== "playing") return;
     if (respondedRef.current) return;
+    if (historyRef.current.length === 0) return;
     respondedRef.current = true;
     setResponded(true);
 
-    const idx = indexRef.current;
-
-    if (idx >= N_LEVEL) {
-      const isMatch = stimuliRef.current[idx] === stimuliRef.current[idx - N_LEVEL];
-      if (isMatch) {
-        hitsRef.current++;
-        setFeedbackType("hit");
-      } else {
-        setFeedbackType("miss");
-      }
+    const canMatch = historyRef.current.length >= N_LEVEL + 1;
+    if (canMatch && currentIsMatchRef.current) {
+      correctRef.current++;
+      setCorrectCount(correctRef.current);
+      setFeedbackType("hit");
     } else {
+      missRef.current++;
+      setMissCount(missRef.current);
       setFeedbackType("miss");
     }
 
-    setTimeout(() => setFeedbackType(null), FEEDBACK_MS);
-  }, []);
-
-  const handleStart = useCallback(() => {
-    scoreRef.current = 0;
-    setScore(0);
-    startRound();
-  }, [startRound]);
+    setTimeout(() => setFeedbackType(null), 400);
+    if (correctRef.current + missRef.current >= TOTAL_ROUNDS) endGame();
+  }, [endGame]);
 
   return (
     <div className="game-container">
@@ -165,10 +173,12 @@ export default function NBackGame() {
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>数字が順番に表示されます</p>
               <p><span className="text-white font-bold">2個前</span>と同じ数字が出たら「同じ」を押してください</p>
+              <p>正解 + ミス・見逃しの合計<span className="text-white font-bold">10回</span>で終了</p>
+              <p>全問正解で<span className="text-white font-bold">満点（20点）</span></p>
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
             </div>
             {remaining > 0 ? (
-              <button onClick={handleStart} className="btn-primary w-full text-lg">
+              <button onClick={startGame} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
             ) : (
@@ -180,17 +190,18 @@ export default function NBackGame() {
           </div>
         )}
 
-        {(phase === "playing" || phase === "feedback") && (
+        {phase === "playing" && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-scale-in">
             <div className="flex justify-between w-full text-sm text-[#64748b]">
               <span>N = 2</span>
-              <span>{currentIndex + 1} / {STIMULI_PER_ROUND}</span>
-              <span>スコア: <span className="text-white font-bold">{score}</span></span>
+              <span>正解: <span className="text-white font-bold">{correctCount}</span></span>
+              <span>ミス: <span className="text-red-400 font-bold">{missCount}</span></span>
+              <span>残り: <span className="text-white font-bold">{TOTAL_ROUNDS - correctCount - missCount}</span></span>
             </div>
 
             <div className="w-32 h-32 rounded-2xl bg-[#1a1a2e] border-2 border-[#2a2a4a] flex items-center justify-center">
               <span className="text-6xl font-black text-white">
-                {currentIndex >= 0 && currentIndex < stimuli.length ? stimuli[currentIndex] : "?"}
+                {currentNumber ?? "?"}
               </span>
             </div>
 
@@ -201,7 +212,7 @@ export default function NBackGame() {
 
             <button
               onClick={handleSameButton}
-              disabled={responded || currentIndex < 0}
+              disabled={responded || currentNumber === null}
               className="btn-primary w-full text-xl py-6 disabled:opacity-40"
             >
               同じ
@@ -217,7 +228,7 @@ export default function NBackGame() {
             best={best}
             unit="点"
             isNewBest={isNewBest}
-            onRetry={handleStart}
+            onRetry={startGame}
             onHome={() => router.push("/")}
             benchmark={(() => {
               const age = getAge();

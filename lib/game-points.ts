@@ -8,7 +8,7 @@ const REFERENCE: Record<GameId, number> = {
   stroop: 18,
   reaction: 250,
   pattern: 12,
-  "n-back":          60,
+  "n-back":          10,
   "dual-task":       10,
   "trail-making":    20,
   "mental-rotation": 10,

@@ -16,7 +16,7 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   stroop:          { min: 0,  max: 60   },
   reaction:        { min: 50, max: 2000 },
   pattern:         { min: 0,  max: 25   },
-  "n-back":          { min: 0, max: 200  },
+  "n-back":          { min: 0, max: 20   },
   "dual-task":       { min: 0, max: 20   },
   "trail-making":    { min: 0, max: 60   },
   "mental-rotation": { min: 0, max: 20   },
