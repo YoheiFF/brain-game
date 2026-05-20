@@ -9,7 +9,7 @@ const REFERENCE: Record<GameId, number> = {
   reaction: 250,
   pattern: 12,
   "n-back":          60,
-  "dual-task":       40,
+  "dual-task":       10,
   "trail-making":    20,
   "mental-rotation": 10,
 }
