@@ -15,7 +15,7 @@ type Phase = "ready" | "playing" | "result";
 const GAME_ID = "n-back" as const;
 const N_LEVEL = 2;
 const TOTAL_ROUNDS = 10;
-const INTERVAL_MS = 1500;
+const INTERVAL_MS = 750;
 
 export default function NBackGame() {
   const router = useRouter();
