@@ -17,8 +17,8 @@ const GAME_ID = "dual-task" as const;
 const TOTAL_ROUNDS = 20;
 const STIMULUS_INTERVAL_MS = 1200;
 const RIGHT_OFFSET_MS = 600;
-const FAST_INTERVAL_MS = 500;
-const FAST_OFFSET_MS = 250;
+const FAST_INTERVAL_MS = 900;
+const FAST_OFFSET_MS = 450;
 const BOOST_THRESHOLD = 15;
 const LEFT_SHAPES: LeftShape[] = ["○", "△", "□", "★"];
 
