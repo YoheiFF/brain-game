@@ -23,7 +23,7 @@ const GAMES: {
   { id: "stroop",         title: "ストループ", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "個" },
   { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "ms", lowerIsBetter: true },
   { id: "pattern",        title: "図形記憶",       description: "光ったマスのパターンを記憶せよ", icon: "🧩", color: "from-green-600 to-teal-600",    unit: "個" },
-  { id: "n-back",          title: "Nバック課題",      description: "N個前と同じ数字か判断せよ！",      icon: "🔄", color: "from-indigo-600 to-blue-700",   unit: "点" },
+  { id: "n-back",          title: "2バック課題",      description: "2個前と同じ数字か判断せよ！",      icon: "🔄", color: "from-indigo-600 to-blue-700",   unit: "点" },
   { id: "dual-task",       title: "注意分割タスク",    description: "左右の刺激に同時に反応しよう",      icon: "👁", color: "from-cyan-600 to-teal-600",     unit: "問" },
   { id: "trail-making",    title: "トレイルメイキング", description: "数字を順番にタップせよ！",          icon: "✏️", color: "from-orange-500 to-red-600",    unit: "秒", lowerIsBetter: true },
   { id: "mental-rotation", title: "心的回転",          description: "図形が同じか鏡像かを判断しよう",    icon: "🔃", color: "from-emerald-500 to-green-700", unit: "点" },

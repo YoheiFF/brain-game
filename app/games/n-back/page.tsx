@@ -13,7 +13,7 @@ import { useBGM } from "@/components/BGMProvider";
 type Phase = "ready" | "playing" | "feedback" | "result";
 
 const GAME_ID = "n-back" as const;
-const N_LEVEL = 3;
+const N_LEVEL = 2;
 const STIMULI_PER_ROUND = 20;
 const INTERVAL_MS = 1500;
 const FEEDBACK_MS = 400;
@@ -157,14 +157,14 @@ export default function NBackGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
-        <GameHeader title="3バック課題" description="3個前と同じ数字が出たら「同じ」を押そう" />
+        <GameHeader title="2バック課題" description="2個前と同じ数字が出たら「同じ」を押そう" />
 
         {phase === "ready" && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🔄</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>数字が順番に表示されます</p>
-              <p><span className="text-white font-bold">3個前</span>と同じ数字が出たら「同じ」を押してください</p>
+              <p><span className="text-white font-bold">2個前</span>と同じ数字が出たら「同じ」を押してください</p>
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
             </div>
             {remaining > 0 ? (
@@ -183,7 +183,7 @@ export default function NBackGame() {
         {(phase === "playing" || phase === "feedback") && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-scale-in">
             <div className="flex justify-between w-full text-sm text-[#64748b]">
-              <span>N = 3</span>
+              <span>N = 2</span>
               <span>{currentIndex + 1} / {STIMULI_PER_ROUND}</span>
               <span>スコア: <span className="text-white font-bold">{score}</span></span>
             </div>
