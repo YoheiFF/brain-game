@@ -17,6 +17,9 @@ const GAME_ID = "dual-task" as const;
 const TOTAL_ROUNDS = 20;
 const STIMULUS_INTERVAL_MS = 1200;
 const RIGHT_OFFSET_MS = 600;
+const FAST_INTERVAL_MS = 500;
+const FAST_OFFSET_MS = 250;
+const BOOST_THRESHOLD = 15;
 const LEFT_SHAPES: LeftShape[] = ["○", "△", "□", "★"];
 
 export default function DualTaskGame() {
@@ -32,6 +35,7 @@ export default function DualTaskGame() {
   const [missCount, setMissCount] = useState<number>(0);
   const [leftFeedback, setLeftFeedback] = useState<"ok" | "ng" | null>(null);
   const [rightFeedback, setRightFeedback] = useState<"ok" | "ng" | null>(null);
+  const [speedBoosted, setSpeedBoosted] = useState(false);
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
@@ -51,6 +55,7 @@ export default function DualTaskGame() {
   const totalMissRef = useRef<number>(0);
   const phaseRef = useRef<Phase>("ready");
   const gameEndedRef = useRef<boolean>(false);
+  const speedBoostedRef = useRef<boolean>(false);
 
   useEffect(() => {
     setBest(getPersonalBest(GAME_ID));
@@ -92,9 +97,64 @@ export default function DualTaskGame() {
     setPhase("result");
   }, [clearAllTimers]);
 
+  // intervalMs / offsetMs を指定してタイマーを（再）起動する
+  const startTimers = useCallback((intervalMs: number, offsetMs: number) => {
+    if (leftTimerRef.current) clearInterval(leftTimerRef.current);
+    if (rightTimerRef.current) clearInterval(rightTimerRef.current);
+    if (rightOffsetRef.current) clearTimeout(rightOffsetRef.current);
+
+    leftTimerRef.current = setInterval(() => {
+      if (gameEndedRef.current) return;
+      if (prevLeftShapeRef.current === "○" && !leftTappedRef.current) {
+        totalMissRef.current++;
+        setMissCount(totalMissRef.current);
+        if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
+          endGame(); return;
+        }
+      }
+      let newShape: LeftShape;
+      do {
+        newShape = LEFT_SHAPES[Math.floor(Math.random() * LEFT_SHAPES.length)];
+      } while (newShape === prevLeftShapeRef.current);
+      prevLeftShapeRef.current = newShape;
+      leftShapeRef.current = newShape;
+      setLeftShape(newShape);
+      leftTappedRef.current = false;
+    }, intervalMs);
+
+    rightOffsetRef.current = setTimeout(() => {
+      rightTimerRef.current = setInterval(() => {
+        if (gameEndedRef.current) return;
+        if (prevRightNumberRef.current !== null && prevRightNumberRef.current % 2 === 0 && !rightTappedRef.current) {
+          totalMissRef.current++;
+          setMissCount(totalMissRef.current);
+          if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
+            endGame(); return;
+          }
+        }
+        let newNumber: number;
+        do {
+          newNumber = Math.floor(Math.random() * 9) + 1;
+        } while (newNumber === prevRightNumberRef.current);
+        prevRightNumberRef.current = newNumber;
+        rightNumberRef.current = newNumber;
+        setRightNumber(newNumber);
+        rightTappedRef.current = false;
+      }, intervalMs);
+    }, offsetMs);
+  }, [endGame]);
+
+  const boostSpeed = useCallback(() => {
+    if (speedBoostedRef.current || gameEndedRef.current) return;
+    speedBoostedRef.current = true;
+    setSpeedBoosted(true);
+    startTimers(FAST_INTERVAL_MS, FAST_OFFSET_MS);
+  }, [startTimers]);
+
   const startGame = useCallback(() => {
     clearAllTimers();
     gameEndedRef.current = false;
+    speedBoostedRef.current = false;
 
     leftCorrectRef.current = 0;
     rightCorrectRef.current = 0;
@@ -114,59 +174,12 @@ export default function DualTaskGame() {
     setRightNumber(null);
     setLeftFeedback(null);
     setRightFeedback(null);
+    setSpeedBoosted(false);
     setIsNewBest(false);
     setPhase("playing");
 
-    // 左パネルタイマー
-    leftTimerRef.current = setInterval(() => {
-      if (gameEndedRef.current) return;
-
-      // 前の刺激が○で未タップ → 見逃し
-      if (prevLeftShapeRef.current === "○" && !leftTappedRef.current) {
-        totalMissRef.current++;
-        setMissCount(totalMissRef.current);
-        if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
-          endGame();
-          return;
-        }
-      }
-
-      let newShape: LeftShape;
-      do {
-        newShape = LEFT_SHAPES[Math.floor(Math.random() * LEFT_SHAPES.length)];
-      } while (newShape === prevLeftShapeRef.current);
-      prevLeftShapeRef.current = newShape;
-      leftShapeRef.current = newShape;
-      setLeftShape(newShape);
-      leftTappedRef.current = false;
-    }, STIMULUS_INTERVAL_MS);
-
-    // 右パネルタイマー（オフセット付き）
-    rightOffsetRef.current = setTimeout(() => {
-      rightTimerRef.current = setInterval(() => {
-        if (gameEndedRef.current) return;
-
-        // 前の刺激が偶数で未タップ → 見逃し
-        if (prevRightNumberRef.current !== null && prevRightNumberRef.current % 2 === 0 && !rightTappedRef.current) {
-          totalMissRef.current++;
-          setMissCount(totalMissRef.current);
-          if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
-            endGame();
-            return;
-          }
-        }
-
-        let newNumber: number;
-        do {
-          newNumber = Math.floor(Math.random() * 9) + 1;
-        } while (newNumber === prevRightNumberRef.current);
-        prevRightNumberRef.current = newNumber;
-        rightNumberRef.current = newNumber;
-        setRightNumber(newNumber);
-        rightTappedRef.current = false;
-      }, STIMULUS_INTERVAL_MS);
-    }, RIGHT_OFFSET_MS);
-  }, [clearAllTimers, endGame]);
+    startTimers(STIMULUS_INTERVAL_MS, RIGHT_OFFSET_MS);
+  }, [clearAllTimers, startTimers]);
 
   const handleLeftTap = useCallback(() => {
     if (phaseRef.current !== "playing") return;
@@ -185,8 +198,11 @@ export default function DualTaskGame() {
     }
 
     setTimeout(() => setLeftFeedback(null), 300);
-    if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) endGame();
-  }, [endGame]);
+
+    const totalCorrect = leftCorrectRef.current + rightCorrectRef.current;
+    if (totalCorrect >= BOOST_THRESHOLD && totalMissRef.current === 0) boostSpeed();
+    if (totalCorrect + totalMissRef.current >= TOTAL_ROUNDS) endGame();
+  }, [endGame, boostSpeed]);
 
   const handleRightTap = useCallback(() => {
     if (phaseRef.current !== "playing") return;
@@ -205,8 +221,11 @@ export default function DualTaskGame() {
     }
 
     setTimeout(() => setRightFeedback(null), 300);
-    if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) endGame();
-  }, [endGame]);
+
+    const totalCorrect = leftCorrectRef.current + rightCorrectRef.current;
+    if (totalCorrect >= BOOST_THRESHOLD && totalMissRef.current === 0) boostSpeed();
+    if (totalCorrect + totalMissRef.current >= TOTAL_ROUNDS) endGame();
+  }, [endGame, boostSpeed]);
 
   return (
     <div className="game-container">
@@ -238,8 +257,9 @@ export default function DualTaskGame() {
 
         {phase === "playing" && (
           <div className="card p-6 flex flex-col items-center gap-4 animate-scale-in">
-            <div className="flex justify-between w-full text-sm">
+            <div className="flex justify-between w-full text-sm items-center">
               <span className="text-[#64748b]">正解: <span className="text-white font-bold">{leftCorrect + rightCorrect}</span></span>
+              {speedBoosted && <span className="text-yellow-400 text-xs font-bold animate-pulse">⚡ 高速モード</span>}
               <span className="text-[#64748b]">ミス: <span className="text-red-400 font-bold">{missCount}</span></span>
               <span className="text-[#64748b]">残り: <span className="text-white font-bold">{TOTAL_ROUNDS - leftCorrect - rightCorrect - missCount}</span></span>
             </div>
@@ -251,6 +271,7 @@ export default function DualTaskGame() {
                 className={`flex-1 h-40 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-100
                   ${leftFeedback === "ok" ? "bg-green-500/20 border-green-500" :
                     leftFeedback === "ng" ? "bg-red-500/20 border-red-500" :
+                    speedBoosted ? "bg-[#1a1a2e] border-yellow-500/50 active:scale-95" :
                     "bg-[#1a1a2e] border-[#2a2a4a] active:scale-95"}`}
               >
                 <span className="text-4xl font-bold text-white">{leftShape ?? ""}</span>
@@ -264,6 +285,7 @@ export default function DualTaskGame() {
                 className={`flex-1 h-40 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-100
                   ${rightFeedback === "ok" ? "bg-green-500/20 border-green-500" :
                     rightFeedback === "ng" ? "bg-red-500/20 border-red-500" :
+                    speedBoosted ? "bg-[#1a1a2e] border-yellow-500/50 active:scale-95" :
                     "bg-[#1a1a2e] border-[#2a2a4a] active:scale-95"}`}
               >
                 <span className="text-4xl font-bold text-white">{rightNumber ?? ""}</span>
