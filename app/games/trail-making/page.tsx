@@ -27,7 +27,7 @@ interface TrailLine {
 }
 
 const GAME_ID = "trail-making" as const;
-const NODE_COUNT = 15;
+const NODE_COUNT = 20;
 const TIME_LIMIT_SEC = 60;
 const TIME_LIMIT_MS = TIME_LIMIT_SEC * 1000;
 const AREA_W = 280;
@@ -214,7 +214,7 @@ export default function TrailMakingGame() {
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">✏️</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
-              <p>1→2→...→15の順にタップしてください</p>
+              <p>1→2→...→20の順にタップしてください</p>
               <p>制限時間: <span className="text-white font-bold">60秒</span></p>
               <p>速く完了するほど高スコア！</p>
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}秒</span></p>}
