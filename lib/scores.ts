@@ -10,7 +10,7 @@ export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBet
   "n-back":           { label: "Nバック課題",     unit: "点" },
   "dual-task":        { label: "注意分割タスク",   unit: "問" },
   "trail-making":     { label: "トレイルメイキング", unit: "点" },
-  "mental-rotation":  { label: "心的回転",         unit: "点" },
+  "mental-rotation":  { label: "心的回転",         unit: "問" },
 };
 
 export const GAME_IDS = Object.keys(GAME_META) as GameId[];

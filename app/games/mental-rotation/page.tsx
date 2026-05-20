@@ -16,7 +16,9 @@ type Verdict = "same" | "mirror";
 const GAME_ID = "mental-rotation" as const;
 const TOTAL_QUESTIONS = 20;
 const FEEDBACK_DURATION_MS = 500;
-const QUESTION_TIME_MS = 2000;
+const HALF_QUESTIONS = 10;
+const TIME_FIRST_HALF_MS = 3000;
+const TIME_SECOND_HALF_MS = 2000;
 const ROTATIONS = [0, 45, 90, 135, 180, 225, 270, 315];
 
 const SHAPES: { id: number; points: string }[] = [
@@ -54,13 +56,14 @@ export default function MentalRotationGame() {
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [rewardedRemaining, setRewardedRemaining] = useState(0);
   const [score, setScore] = useState<number>(0);
+  const [questionNum, setQuestionNum] = useState<number>(0);
 
   const correctCountRef = useRef<number>(0);
+  const questionNumRef = useRef<number>(0);
   const isFlippedRef = useRef<boolean>(false);
   const questionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const questionStartRef = useRef<number>(0);
   const answeredRef = useRef<boolean>(false);
-  const mistakesRef = useRef<number>(0);
   const deckRef = useRef<typeof SHAPES>([]);
 
   useEffect(() => {
@@ -100,7 +103,7 @@ export default function MentalRotationGame() {
 
   const endGame = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
-    const finalScore = Math.max(0, correctCountRef.current * 10 - mistakesRef.current * 5);
+    const finalScore = correctCountRef.current;
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const newBest = saveScore(GAME_ID, finalScore, nickname, userId);
@@ -118,16 +121,20 @@ export default function MentalRotationGame() {
 
   const startQuestionTimer = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
+    questionNumRef.current++;
+    setQuestionNum(questionNumRef.current);
     answeredRef.current = false;
     questionStartRef.current = Date.now();
     setTimeProgress(100);
 
+    const timeLimit = questionNumRef.current <= HALF_QUESTIONS ? TIME_FIRST_HALF_MS : TIME_SECOND_HALF_MS;
+
     questionTimerRef.current = setInterval(() => {
       const elapsed = Date.now() - questionStartRef.current;
-      const progress = Math.max(0, 1 - elapsed / QUESTION_TIME_MS);
+      const progress = Math.max(0, 1 - elapsed / timeLimit);
       setTimeProgress(progress * 100);
 
-      if (elapsed >= QUESTION_TIME_MS) {
+      if (elapsed >= timeLimit) {
         clearInterval(questionTimerRef.current!);
         if (answeredRef.current) return;
         answeredRef.current = true;
@@ -135,7 +142,7 @@ export default function MentalRotationGame() {
         setPhase("feedback");
 
         setTimeout(() => {
-          if (correctCountRef.current >= TOTAL_QUESTIONS) {
+          if (questionNumRef.current >= TOTAL_QUESTIONS) {
             endGame();
           } else {
             applyNextQuestion();
@@ -153,9 +160,10 @@ export default function MentalRotationGame() {
   const startGame = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     correctCountRef.current = 0;
-    mistakesRef.current = 0;
+    questionNumRef.current = 0;
     deckRef.current = [];
     setCorrectCount(0);
+    setQuestionNum(0);
     setScore(0);
     setLastVerdict(null);
     setIsNewBest(false);
@@ -175,14 +183,13 @@ export default function MentalRotationGame() {
       setCorrectCount(correctCountRef.current);
       setLastVerdict("correct");
     } else {
-      mistakesRef.current++;
       setLastVerdict("wrong");
     }
 
     setPhase("feedback");
 
     setTimeout(() => {
-      if (correctCountRef.current >= TOTAL_QUESTIONS) {
+      if (questionNumRef.current >= TOTAL_QUESTIONS) {
         endGame();
       } else {
         nextQuestion();
@@ -201,9 +208,9 @@ export default function MentalRotationGame() {
             <div className="text-6xl">🔃</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>図形が<span className="text-white font-bold">同じ向き</span>か<span className="text-white font-bold">鏡像</span>かを判断してください</p>
-              <p>回答時間: <span className="text-white font-bold">2秒</span></p>
+              <p>前半10問: <span className="text-white font-bold">3秒</span> → 後半10問: <span className="text-orange-400 font-bold">2秒</span></p>
               <p>全<span className="text-white font-bold">{TOTAL_QUESTIONS}問</span>中何問正解できるか！</p>
-              {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}点</span></p>}
+              {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}問</span></p>}
             </div>
             {remaining > 0 ? (
               <button onClick={startGame} className="btn-primary w-full text-lg">
@@ -221,7 +228,11 @@ export default function MentalRotationGame() {
         {(phase === "playing" || phase === "feedback") && (
           <div className="card p-6 flex flex-col items-center gap-4 animate-scale-in">
             <div className="flex justify-between w-full text-sm">
-              <span className="text-[#64748b]">正解: <span className="text-white font-bold">{correctCount}/{TOTAL_QUESTIONS}</span></span>
+              <span className="text-[#64748b]">正解: <span className="text-white font-bold">{correctCount}</span></span>
+              <span className={`font-bold ${questionNum > HALF_QUESTIONS ? "text-orange-400" : "text-[#64748b]"}`}>
+                {questionNum}/{TOTAL_QUESTIONS}問
+                {questionNum > HALF_QUESTIONS && <span className="text-xs ml-1">⚡後半</span>}
+              </span>
             </div>
 
             {/* タイムバー */}
@@ -297,7 +308,7 @@ export default function MentalRotationGame() {
           <ResultModal
             score={score}
             best={best}
-            unit="点"
+            unit="問"
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
@@ -305,7 +316,7 @@ export default function MentalRotationGame() {
               const age = getAge();
               if (!age) return undefined;
               const b = getBenchmark(GAME_ID, age);
-              return { ...b, unit: "点" };
+              return { ...b, unit: "問" };
             })()}
             gameId={GAME_ID}
           />
