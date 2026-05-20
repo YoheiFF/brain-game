@@ -9,7 +9,7 @@ export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBet
   pattern:       { label: "図形記憶",       unit: "個" },
   "n-back":           { label: "Nバック課題",     unit: "点" },
   "dual-task":        { label: "注意分割タスク",   unit: "問" },
-  "trail-making":     { label: "トレイルメイキング", unit: "点" },
+  "trail-making":     { label: "トレイルメイキング", unit: "秒", lowerIsBetter: true },
   "mental-rotation":  { label: "心的回転",         unit: "問" },
 };
 

@@ -123,10 +123,11 @@ export default function TrailMakingGame() {
     if (timerRef.current) clearInterval(timerRef.current);
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
-    saveScore(GAME_ID, 0, nickname, userId);
-    recordPlay(GAME_ID, 0);
+    const newBest = saveScore(GAME_ID, TIME_LIMIT_SEC, nickname, userId);
+    recordPlay(GAME_ID, TIME_LIMIT_SEC);
     setRemaining(getRemainingPlays(GAME_ID));
-    setScore(0);
+    setBest(newBest);
+    setScore(TIME_LIMIT_SEC);
     setIsNewBest(false);
     setPhase("result");
   }, []);
@@ -183,14 +184,14 @@ export default function TrailMakingGame() {
         // 最後のノードをタップ
         if (timerRef.current) clearInterval(timerRef.current);
         const elapsed = Date.now() - startTimeRef.current;
-        const finalScore = Math.max(0, 1000 - Math.floor(elapsed / 100));
+        const finalScore = parseFloat((elapsed / 1000).toFixed(1));
         const nickname = getNickname() ?? "ゲスト";
         const userId = getOrInitUserId();
         const newBest = saveScore(GAME_ID, finalScore, nickname, userId);
         recordPlay(GAME_ID, finalScore);
         setRemaining(getRemainingPlays(GAME_ID));
         setBest(newBest);
-        setIsNewBest(newBest === finalScore && finalScore > 0);
+        setIsNewBest(newBest === finalScore);
         setScore(finalScore);
         setPhase("result");
       } else {
@@ -216,7 +217,7 @@ export default function TrailMakingGame() {
               <p>1→2→...→15の順にタップしてください</p>
               <p>制限時間: <span className="text-white font-bold">60秒</span></p>
               <p>速く完了するほど高スコア！</p>
-              {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
+              {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}秒</span></p>}
             </div>
             {remaining > 0 ? (
               <button onClick={startGame} className="btn-primary w-full text-lg">
@@ -289,7 +290,8 @@ export default function TrailMakingGame() {
           <ResultModal
             score={score}
             best={best}
-            unit="点"
+            unit="秒"
+            lowerIsBetter
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
@@ -297,7 +299,7 @@ export default function TrailMakingGame() {
               const age = getAge();
               if (!age) return undefined;
               const b = getBenchmark(GAME_ID, age);
-              return { ...b, unit: "点" };
+              return { ...b, unit: "秒", lowerIsBetter: true };
             })()}
             gameId={GAME_ID}
           />
