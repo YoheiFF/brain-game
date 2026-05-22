@@ -1,5 +1,5 @@
 export type GameId = "calculation" | "memory-number" | "stroop" | "reaction" | "pattern"
-  | "n-back" | "dual-task" | "trail-making" | "mental-rotation";
+  | "n-back" | "dual-task" | "trail-making" | "mental-rotation" | "running-total";
 
 export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBetter?: boolean }> = {
   calculation:   { label: "計算ゲーム",     unit: "問" },
@@ -11,6 +11,7 @@ export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBet
   "dual-task":        { label: "注意分割タスク",   unit: "問" },
   "trail-making":     { label: "トレイルメイキング", unit: "秒", lowerIsBetter: true },
   "mental-rotation":  { label: "心的回転",         unit: "問" },
+  "running-total":    { label: "暗算ランニング",    unit: "問" },
 };
 
 export const GAME_IDS = Object.keys(GAME_META) as GameId[];

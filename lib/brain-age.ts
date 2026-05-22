@@ -10,6 +10,7 @@ const AGE_BENCHMARKS: Record<GameId, Record<number, number>> = {
   "dual-task":       { 15: 10, 25: 11, 35: 10, 45: 9,  55: 7,  65: 5  },
   "trail-making":    { 15: 14, 25: 16, 35: 20, 45: 27, 55: 36, 65: 48 },
   "mental-rotation": { 15: 14, 25: 15, 35: 14, 45: 12, 55: 10, 65: 8  },
+  "running-total":   { 15: 6,  25: 6,  35: 5,  45: 5,  55: 4,  65: 3  },
 }
 
 const AGE_POINTS = [15, 25, 35, 45, 55, 65]

@@ -85,6 +85,14 @@ const BENCHMARKS: Record<GameId, Record<AgeGroup, number>> = {
     "50代":   11,
     "60代以上": 9,
   },
+  "running-total": {
+    "10代":    6,
+    "20代":    6,
+    "30代":    5,
+    "40代":    5,
+    "50代":    4,
+    "60代以上": 3,
+  },
 };
 
 export function getBenchmark(gameId: GameId, age: number): { ageGroup: AgeGroup; average: number } {

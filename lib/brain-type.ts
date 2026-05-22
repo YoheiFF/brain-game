@@ -20,10 +20,11 @@ export const SKILL_MAP: Record<GameId, CognitiveSkill> = {
   "dual-task":       "集中力",
   "trail-making":    "反応速度",
   "mental-rotation": "空間認識",
+  "running-total":   "計算力",
 }
 
 export const SKILL_GAMES: Record<CognitiveSkill, { id: GameId; title: string }[]> = {
-  計算力:   [{ id: "calculation",     title: "計算ゲーム" }],
+  計算力:   [{ id: "calculation",   title: "計算ゲーム" }, { id: "running-total", title: "暗算ランニング" }],
   記憶力:   [{ id: "memory-number",   title: "数字記憶" }, { id: "n-back", title: "3バック課題" }],
   集中力:   [{ id: "stroop",          title: "ストループ" }, { id: "dual-task", title: "注意分割タスク" }],
   反応速度: [{ id: "reaction",        title: "反応速度テスト" }, { id: "trail-making", title: "トレイルメイキング" }],

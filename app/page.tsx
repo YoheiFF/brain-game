@@ -27,6 +27,7 @@ const GAMES: {
   { id: "dual-task",       title: "注意分割タスク",    description: "左右の刺激に同時に反応しよう",      icon: "👁", color: "from-cyan-600 to-teal-600",     unit: "問" },
   { id: "trail-making",    title: "トレイルメイキング", description: "数字を順番にタップせよ！",          icon: "✏️", color: "from-orange-500 to-red-600",    unit: "秒", lowerIsBetter: true },
   { id: "mental-rotation", title: "心的回転",          description: "図形が同じか鏡像かを判断しよう",    icon: "🔃", color: "from-emerald-500 to-green-700", unit: "点" },
+  { id: "running-total",   title: "暗算ランニング",     description: "流れる数字を頭で足し引き！合計を当てろ", icon: "📈", color: "from-teal-600 to-cyan-700",     unit: "問" },
 ];
 
 export default function Home() {

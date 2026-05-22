@@ -36,6 +36,7 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   "dual-task":       { min: 0, max: 99   },
   "trail-making":    { min: 0, max: 1000 },
   "mental-rotation": { min: 0, max: 20   },
+  "running-total":   { min: 0, max: 10   },
 };
 
 /** 1日あたりの同一ゲーム最大プレイ回数 */
