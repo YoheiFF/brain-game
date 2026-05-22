@@ -14,10 +14,22 @@ type Phase = "ready" | "playing" | "result";
 
 const GAME_ID = "n-back" as const;
 const N_LEVEL = 2;
-const TOTAL_ROUNDS = 10;
-const INTERVAL_NORMAL = 1250;
-const INTERVAL_FAST = 1000;
-const SPEED_UP_AT = 5;
+const TOTAL_ROUNDS = 20;
+
+// 正解数に応じた速度ステージ
+const SPEED_STAGES = [
+  { threshold: 0,  ms: 1250, label: "通常" },
+  { threshold: 10, ms: 1000, label: "⚡ 高速モード！" },
+  { threshold: 15, ms: 800,  label: "⚡⚡ 超高速！" },
+] as const;
+
+function getStageIndex(correct: number): number {
+  let stage = 0;
+  for (let i = 0; i < SPEED_STAGES.length; i++) {
+    if (correct >= SPEED_STAGES[i].threshold) stage = i;
+  }
+  return stage;
+}
 
 export default function NBackGame() {
   const router = useRouter();
@@ -34,7 +46,7 @@ export default function NBackGame() {
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [rewardedRemaining, setRewardedRemaining] = useState(0);
-  const [isFastMode, setIsFastMode] = useState(false);
+  const [speedStage, setSpeedStage] = useState(0);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const historyRef = useRef<number[]>([]);
@@ -44,7 +56,7 @@ export default function NBackGame() {
   const missRef = useRef<number>(0);
   const phaseRef = useRef<Phase>("ready");
   const gameEndedRef = useRef<boolean>(false);
-  const isFastModeRef = useRef<boolean>(false);
+  const speedStageRef = useRef<number>(0);
 
   useEffect(() => {
     setBest(getPersonalBest(GAME_ID));
@@ -92,7 +104,7 @@ export default function NBackGame() {
     if (gameEndedRef.current) return;
     gameEndedRef.current = true;
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const finalScore = correctRef.current * 2;
+    const finalScore = correctRef.current;
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const newBest = saveScore(GAME_ID, finalScore, nickname, userId);
@@ -132,7 +144,7 @@ export default function NBackGame() {
 
   const startGame = useCallback(() => {
     gameEndedRef.current = false;
-    isFastModeRef.current = false;
+    speedStageRef.current = 0;
     historyRef.current = [];
     currentIsMatchRef.current = false;
     respondedRef.current = false;
@@ -146,10 +158,10 @@ export default function NBackGame() {
     setFeedbackType(null);
     setResponded(false);
     setIsNewBest(false);
-    setIsFastMode(false);
+    setSpeedStage(0);
     setPhase("playing");
 
-    launchInterval(INTERVAL_NORMAL);
+    launchInterval(SPEED_STAGES[0].ms);
   }, [endGame, launchInterval]);
 
   const handleSameButton = useCallback(() => {
@@ -164,11 +176,13 @@ export default function NBackGame() {
       correctRef.current++;
       setCorrectCount(correctRef.current);
       setFeedbackType("hit");
-      // 正解5問到達で高速モード切り替え
-      if (correctRef.current === SPEED_UP_AT && !isFastModeRef.current) {
-        isFastModeRef.current = true;
-        setIsFastMode(true);
-        launchInterval(INTERVAL_FAST);
+
+      // 正解数に応じて速度ステージを更新
+      const newStage = getStageIndex(correctRef.current);
+      if (newStage > speedStageRef.current) {
+        speedStageRef.current = newStage;
+        setSpeedStage(newStage);
+        launchInterval(SPEED_STAGES[newStage].ms);
       }
     } else {
       missRef.current++;
@@ -191,8 +205,9 @@ export default function NBackGame() {
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>数字が順番に表示されます</p>
               <p><span className="text-white font-bold">2個前</span>と同じ数字が出たら「同じ」を押してください</p>
-              <p>正解 + ミス・見逃しの合計<span className="text-white font-bold">10回</span>で終了</p>
-              <p>正解<span className="text-white font-bold">5問</span>で⚡高速モード（1秒）突入</p>
+              <p>正解 + ミス・見逃しの合計<span className="text-white font-bold">20回</span>で終了</p>
+              <p>正解<span className="text-white font-bold">10問</span>で⚡高速モード（1秒）</p>
+              <p>正解<span className="text-white font-bold">15問</span>で⚡⚡超高速（0.8秒）</p>
               <p>全問正解で<span className="text-white font-bold">満点（20点）</span></p>
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
             </div>
@@ -217,8 +232,10 @@ export default function NBackGame() {
               <span>ミス: <span className="text-red-400 font-bold">{missCount}</span></span>
               <span>残り: <span className="text-white font-bold">{TOTAL_ROUNDS - correctCount - missCount}</span></span>
             </div>
-            {isFastMode && (
-              <div className="text-yellow-400 font-bold text-sm animate-pulse">⚡ 高速モード！</div>
+            {speedStage > 0 && (
+              <div className={`font-bold text-sm animate-pulse ${speedStage >= 2 ? "text-orange-400" : "text-yellow-400"}`}>
+                {SPEED_STAGES[speedStage].label}
+              </div>
             )}
 
             <div className="w-32 h-32 rounded-2xl bg-[#1a1a2e] border-2 border-[#2a2a4a] flex items-center justify-center">
