@@ -17,8 +17,10 @@ type LeftShape = "○" | "△" | "□" | "★";
 
 const GAME_ID = "dual-task" as const;
 const TOTAL_ROUNDS = 20;
-const STIMULUS_INTERVAL_MS = 1200;
-const FAST_INTERVAL_MS = 900;
+const LEFT_INTERVAL_MS = 1100;
+const RIGHT_INTERVAL_MS = 1000;
+const FAST_LEFT_INTERVAL_MS = 700;
+const FAST_RIGHT_INTERVAL_MS = 800;
 const BOOST_THRESHOLD = 15;
 const LEFT_SHAPES: LeftShape[] = ["○", "△", "□", "★"];
 
@@ -41,7 +43,8 @@ export default function DualTaskGame() {
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [rewardedRemaining, setRewardedRemaining] = useState(0);
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const leftTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rightTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const leftShapeRef = useRef<LeftShape | null>(null);
   const rightNumberRef = useRef<number | null>(null);
   const prevLeftShapeRef = useRef<LeftShape | null>(null);
@@ -68,7 +71,8 @@ export default function DualTaskGame() {
   }, [phase, pause, resume]);
 
   const clearAllTimers = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (leftTimerRef.current) clearInterval(leftTimerRef.current);
+    if (rightTimerRef.current) clearInterval(rightTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -93,27 +97,20 @@ export default function DualTaskGame() {
     setPhase("result");
   }, [clearAllTimers]);
 
-  // 左右を同時に切り替える単一インターバル
-  const startTimers = useCallback((intervalMs: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
+  // 左右を別インターバルで独立して切り替える
+  const startTimers = useCallback((leftMs: number, rightMs: number) => {
+    if (leftTimerRef.current) clearInterval(leftTimerRef.current);
+    if (rightTimerRef.current) clearInterval(rightTimerRef.current);
 
-    timerRef.current = setInterval(() => {
+    leftTimerRef.current = setInterval(() => {
       if (gameEndedRef.current) return;
-
-      // 左右それぞれの見逃しを同時に集計
-      let newMisses = 0;
-      if (prevLeftShapeRef.current === "○" && !leftTappedRef.current) newMisses++;
-      if (prevRightNumberRef.current !== null && prevRightNumberRef.current % 2 === 0 && !rightTappedRef.current) newMisses++;
-
-      if (newMisses > 0) {
-        totalMissRef.current += newMisses;
+      if (prevLeftShapeRef.current === "○" && !leftTappedRef.current) {
+        totalMissRef.current++;
         setMissCount(totalMissRef.current);
         if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
           endGame(); return;
         }
       }
-
-      // 左: 新しい図形
       let newShape: LeftShape;
       do {
         newShape = LEFT_SHAPES[Math.floor(Math.random() * LEFT_SHAPES.length)];
@@ -122,8 +119,17 @@ export default function DualTaskGame() {
       leftShapeRef.current = newShape;
       setLeftShape(newShape);
       leftTappedRef.current = false;
+    }, leftMs);
 
-      // 右: 新しい数字
+    rightTimerRef.current = setInterval(() => {
+      if (gameEndedRef.current) return;
+      if (prevRightNumberRef.current !== null && prevRightNumberRef.current % 2 === 0 && !rightTappedRef.current) {
+        totalMissRef.current++;
+        setMissCount(totalMissRef.current);
+        if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
+          endGame(); return;
+        }
+      }
       let newNumber: number;
       do {
         newNumber = Math.floor(Math.random() * 9) + 1;
@@ -132,14 +138,14 @@ export default function DualTaskGame() {
       rightNumberRef.current = newNumber;
       setRightNumber(newNumber);
       rightTappedRef.current = false;
-    }, intervalMs);
+    }, rightMs);
   }, [endGame]);
 
   const boostSpeed = useCallback(() => {
     if (speedBoostedRef.current || gameEndedRef.current) return;
     speedBoostedRef.current = true;
     setSpeedBoosted(true);
-    startTimers(FAST_INTERVAL_MS);
+    startTimers(FAST_LEFT_INTERVAL_MS, FAST_RIGHT_INTERVAL_MS);
   }, [startTimers]);
 
   const startGame = useCallback(() => {
@@ -169,7 +175,7 @@ export default function DualTaskGame() {
     setIsNewBest(false);
     setPhase("playing");
 
-    startTimers(STIMULUS_INTERVAL_MS);
+    startTimers(LEFT_INTERVAL_MS, RIGHT_INTERVAL_MS);
   }, [clearAllTimers, startTimers]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
