@@ -20,9 +20,9 @@ const TOTAL_ROUNDS = 20;
 
 // 正解数に応じた速度ステージ
 const SPEED_STAGES = [
-  { threshold: 0,  ms: 1250, label: "通常" },
-  { threshold: 10, ms: 1000, label: "⚡ 高速モード！" },
-  { threshold: 15, ms: 800,  label: "⚡⚡ 超高速！" },
+  { threshold: 0,  ms: 1100, label: "通常" },
+  { threshold: 10, ms: 900,  label: "⚡ 高速モード！" },
+  { threshold: 15, ms: 700,  label: "⚡⚡ 超高速！" },
 ] as const;
 
 function getStageIndex(correct: number): number {
