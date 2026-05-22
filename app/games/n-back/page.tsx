@@ -15,7 +15,9 @@ type Phase = "ready" | "playing" | "result";
 const GAME_ID = "n-back" as const;
 const N_LEVEL = 2;
 const TOTAL_ROUNDS = 10;
-const INTERVAL_MS = 750;
+const INTERVAL_NORMAL = 1250;
+const INTERVAL_FAST = 1000;
+const SPEED_UP_AT = 5;
 
 export default function NBackGame() {
   const router = useRouter();
@@ -32,6 +34,7 @@ export default function NBackGame() {
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [rewardedRemaining, setRewardedRemaining] = useState(0);
+  const [isFastMode, setIsFastMode] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const historyRef = useRef<number[]>([]);
@@ -41,6 +44,7 @@ export default function NBackGame() {
   const missRef = useRef<number>(0);
   const phaseRef = useRef<Phase>("ready");
   const gameEndedRef = useRef<boolean>(false);
+  const isFastModeRef = useRef<boolean>(false);
 
   useEffect(() => {
     setBest(getPersonalBest(GAME_ID));
@@ -100,9 +104,35 @@ export default function NBackGame() {
     setPhase("result");
   }, []);
 
-  const startGame = useCallback(() => {
+  const tick = useCallback(() => {
+    if (gameEndedRef.current) return;
+
+    // 前の刺激がマッチで未回答 → 見逃し
+    if (currentIsMatchRef.current && !respondedRef.current && historyRef.current.length >= N_LEVEL) {
+      missRef.current++;
+      setMissCount(missRef.current);
+      if (correctRef.current + missRef.current >= TOTAL_ROUNDS) {
+        endGame(); return;
+      }
+    }
+
+    const { num, isMatch } = nextStimulus(historyRef.current);
+    historyRef.current.push(num);
+    currentIsMatchRef.current = isMatch;
+    respondedRef.current = false;
+    setCurrentNumber(num);
+    setResponded(false);
+    setFeedbackType(null);
+  }, [endGame]);
+
+  const launchInterval = useCallback((ms: number) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(tick, ms);
+  }, [tick]);
+
+  const startGame = useCallback(() => {
     gameEndedRef.current = false;
+    isFastModeRef.current = false;
     historyRef.current = [];
     currentIsMatchRef.current = false;
     respondedRef.current = false;
@@ -116,29 +146,11 @@ export default function NBackGame() {
     setFeedbackType(null);
     setResponded(false);
     setIsNewBest(false);
+    setIsFastMode(false);
     setPhase("playing");
 
-    intervalRef.current = setInterval(() => {
-      if (gameEndedRef.current) return;
-
-      // 前の刺激がマッチで未回答 → 見逃し
-      if (currentIsMatchRef.current && !respondedRef.current && historyRef.current.length >= N_LEVEL) {
-        missRef.current++;
-        setMissCount(missRef.current);
-        if (correctRef.current + missRef.current >= TOTAL_ROUNDS) {
-          endGame(); return;
-        }
-      }
-
-      const { num, isMatch } = nextStimulus(historyRef.current);
-      historyRef.current.push(num);
-      currentIsMatchRef.current = isMatch;
-      respondedRef.current = false;
-      setCurrentNumber(num);
-      setResponded(false);
-      setFeedbackType(null);
-    }, INTERVAL_MS);
-  }, [endGame]);
+    launchInterval(INTERVAL_NORMAL);
+  }, [endGame, launchInterval]);
 
   const handleSameButton = useCallback(() => {
     if (phaseRef.current !== "playing") return;
@@ -152,6 +164,12 @@ export default function NBackGame() {
       correctRef.current++;
       setCorrectCount(correctRef.current);
       setFeedbackType("hit");
+      // 正解5問到達で高速モード切り替え
+      if (correctRef.current === SPEED_UP_AT && !isFastModeRef.current) {
+        isFastModeRef.current = true;
+        setIsFastMode(true);
+        launchInterval(INTERVAL_FAST);
+      }
     } else {
       missRef.current++;
       setMissCount(missRef.current);
@@ -160,7 +178,7 @@ export default function NBackGame() {
 
     setTimeout(() => setFeedbackType(null), 400);
     if (correctRef.current + missRef.current >= TOTAL_ROUNDS) endGame();
-  }, [endGame]);
+  }, [endGame, launchInterval]);
 
   return (
     <div className="game-container">
@@ -174,6 +192,7 @@ export default function NBackGame() {
               <p>数字が順番に表示されます</p>
               <p><span className="text-white font-bold">2個前</span>と同じ数字が出たら「同じ」を押してください</p>
               <p>正解 + ミス・見逃しの合計<span className="text-white font-bold">10回</span>で終了</p>
+              <p>正解<span className="text-white font-bold">5問</span>で⚡高速モード（1秒）突入</p>
               <p>全問正解で<span className="text-white font-bold">満点（20点）</span></p>
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
             </div>
@@ -198,6 +217,9 @@ export default function NBackGame() {
               <span>ミス: <span className="text-red-400 font-bold">{missCount}</span></span>
               <span>残り: <span className="text-white font-bold">{TOTAL_ROUNDS - correctCount - missCount}</span></span>
             </div>
+            {isFastMode && (
+              <div className="text-yellow-400 font-bold text-sm animate-pulse">⚡ 高速モード！</div>
+            )}
 
             <div className="w-32 h-32 rounded-2xl bg-[#1a1a2e] border-2 border-[#2a2a4a] flex items-center justify-center">
               <span className="text-6xl font-black text-white">
