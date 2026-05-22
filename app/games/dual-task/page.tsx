@@ -18,9 +18,7 @@ type LeftShape = "○" | "△" | "□" | "★";
 const GAME_ID = "dual-task" as const;
 const TOTAL_ROUNDS = 20;
 const STIMULUS_INTERVAL_MS = 1200;
-const RIGHT_OFFSET_MS = 600;
 const FAST_INTERVAL_MS = 900;
-const FAST_OFFSET_MS = 450;
 const BOOST_THRESHOLD = 15;
 const LEFT_SHAPES: LeftShape[] = ["○", "△", "□", "★"];
 
@@ -43,9 +41,7 @@ export default function DualTaskGame() {
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [rewardedRemaining, setRewardedRemaining] = useState(0);
 
-  const leftTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const rightTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const rightOffsetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const leftShapeRef = useRef<LeftShape | null>(null);
   const rightNumberRef = useRef<number | null>(null);
   const prevLeftShapeRef = useRef<LeftShape | null>(null);
@@ -72,9 +68,7 @@ export default function DualTaskGame() {
   }, [phase, pause, resume]);
 
   const clearAllTimers = useCallback(() => {
-    if (leftTimerRef.current) clearInterval(leftTimerRef.current);
-    if (rightTimerRef.current) clearInterval(rightTimerRef.current);
-    if (rightOffsetRef.current) clearTimeout(rightOffsetRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
   useEffect(() => {
@@ -99,21 +93,27 @@ export default function DualTaskGame() {
     setPhase("result");
   }, [clearAllTimers]);
 
-  // intervalMs / offsetMs を指定してタイマーを（再）起動する
-  const startTimers = useCallback((intervalMs: number, offsetMs: number) => {
-    if (leftTimerRef.current) clearInterval(leftTimerRef.current);
-    if (rightTimerRef.current) clearInterval(rightTimerRef.current);
-    if (rightOffsetRef.current) clearTimeout(rightOffsetRef.current);
+  // 左右を同時に切り替える単一インターバル
+  const startTimers = useCallback((intervalMs: number) => {
+    if (timerRef.current) clearInterval(timerRef.current);
 
-    leftTimerRef.current = setInterval(() => {
+    timerRef.current = setInterval(() => {
       if (gameEndedRef.current) return;
-      if (prevLeftShapeRef.current === "○" && !leftTappedRef.current) {
-        totalMissRef.current++;
+
+      // 左右それぞれの見逃しを同時に集計
+      let newMisses = 0;
+      if (prevLeftShapeRef.current === "○" && !leftTappedRef.current) newMisses++;
+      if (prevRightNumberRef.current !== null && prevRightNumberRef.current % 2 === 0 && !rightTappedRef.current) newMisses++;
+
+      if (newMisses > 0) {
+        totalMissRef.current += newMisses;
         setMissCount(totalMissRef.current);
         if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
           endGame(); return;
         }
       }
+
+      // 左: 新しい図形
       let newShape: LeftShape;
       do {
         newShape = LEFT_SHAPES[Math.floor(Math.random() * LEFT_SHAPES.length)];
@@ -122,35 +122,24 @@ export default function DualTaskGame() {
       leftShapeRef.current = newShape;
       setLeftShape(newShape);
       leftTappedRef.current = false;
-    }, intervalMs);
 
-    rightOffsetRef.current = setTimeout(() => {
-      rightTimerRef.current = setInterval(() => {
-        if (gameEndedRef.current) return;
-        if (prevRightNumberRef.current !== null && prevRightNumberRef.current % 2 === 0 && !rightTappedRef.current) {
-          totalMissRef.current++;
-          setMissCount(totalMissRef.current);
-          if (leftCorrectRef.current + rightCorrectRef.current + totalMissRef.current >= TOTAL_ROUNDS) {
-            endGame(); return;
-          }
-        }
-        let newNumber: number;
-        do {
-          newNumber = Math.floor(Math.random() * 9) + 1;
-        } while (newNumber === prevRightNumberRef.current);
-        prevRightNumberRef.current = newNumber;
-        rightNumberRef.current = newNumber;
-        setRightNumber(newNumber);
-        rightTappedRef.current = false;
-      }, intervalMs);
-    }, offsetMs);
+      // 右: 新しい数字
+      let newNumber: number;
+      do {
+        newNumber = Math.floor(Math.random() * 9) + 1;
+      } while (newNumber === prevRightNumberRef.current);
+      prevRightNumberRef.current = newNumber;
+      rightNumberRef.current = newNumber;
+      setRightNumber(newNumber);
+      rightTappedRef.current = false;
+    }, intervalMs);
   }, [endGame]);
 
   const boostSpeed = useCallback(() => {
     if (speedBoostedRef.current || gameEndedRef.current) return;
     speedBoostedRef.current = true;
     setSpeedBoosted(true);
-    startTimers(FAST_INTERVAL_MS, FAST_OFFSET_MS);
+    startTimers(FAST_INTERVAL_MS);
   }, [startTimers]);
 
   const startGame = useCallback(() => {
@@ -180,7 +169,7 @@ export default function DualTaskGame() {
     setIsNewBest(false);
     setPhase("playing");
 
-    startTimers(STIMULUS_INTERVAL_MS, RIGHT_OFFSET_MS);
+    startTimers(STIMULUS_INTERVAL_MS);
   }, [clearAllTimers, startTimers]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
