@@ -15,27 +15,25 @@ import CountdownOverlay from "@/components/CountdownOverlay";
 type Phase = "ready" | "playing" | "result";
 type SubPhase = "showing-number" | "showing-ops" | "answering";
 
-type RoundOp = {
-  sign: "+" | "-";
-  value: number;
-};
-
-type Round = {
-  initial: number;
-  ops: RoundOp[];
-  answer: number;
-  choices: number[];
-};
+type RoundOp = { sign: "+" | "-"; value: number };
+type Round = { initial: number; ops: RoundOp[]; answer: number; choices: number[] };
+type Stage = { threshold: number; initialMs: number; opMs: number; answerSec: number; opsCount: number; label: string | null };
 
 const TOTAL_ROUNDS = 10;
-const INITIAL_DISPLAY_MS = 2000;
-const OP_DISPLAY_MS = 1500;
-const FAST_INITIAL_DISPLAY_MS = 1500;
-const FAST_OP_DISPLAY_MS = 1000;
-const SPEED_BOOST_THRESHOLD = 7;
-const OPS_COUNT = 4;
 const CHOICE_OFFSETS = [5, 10, 15];
-const ANSWER_SECONDS = 5;
+
+const STAGES: Stage[] = [
+  { threshold: 0, initialMs: 1500, opMs: 1500, answerSec: 3, opsCount: 4, label: null },
+  { threshold: 2, initialMs: 1500, opMs: 1000, answerSec: 3, opsCount: 4, label: "⚡ 高速" },
+  { threshold: 5, initialMs: 1000, opMs:  700, answerSec: 3, opsCount: 4, label: "⚡⚡ 超高速" },
+  { threshold: 8, initialMs: 1000, opMs:  700, answerSec: 3, opsCount: 8, label: "💪 高難度" },
+];
+
+function getStage(score: number): Stage {
+  let stage = STAGES[0];
+  for (const s of STAGES) { if (score >= s.threshold) stage = s; }
+  return stage;
+}
 
 function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -53,19 +51,19 @@ function shuffle<T>(arr: T[]): T[] {
 function generateChoices(answer: number): number[] {
   const distractors: number[] = [];
   for (const offset of CHOICE_OFFSETS) {
-    let distractor = Math.random() < 0.5 ? answer + offset : answer - offset;
-    if (distractor < 0) distractor = answer + offset;
-    if (distractor === answer) distractor = answer + offset + 1;
-    distractors.push(distractor);
+    let d = Math.random() < 0.5 ? answer + offset : answer - offset;
+    if (d < 0) d = answer + offset;
+    if (d === answer) d = answer + offset + 1;
+    distractors.push(d);
   }
   return shuffle([answer, ...distractors]);
 }
 
-function generateRound(): Round {
+function generateRound(opsCount: number): Round {
   const initial = randInt(10, 30);
   const ops: RoundOp[] = [];
   let running = initial;
-  for (let i = 0; i < OPS_COUNT; i++) {
+  for (let i = 0; i < opsCount; i++) {
     const value = randInt(1, 15);
     let sign: "+" | "-" = Math.random() < 0.5 ? "+" : "-";
     if (sign === "-" && running - value < 0) sign = "+";
@@ -75,24 +73,20 @@ function generateRound(): Round {
   return { initial, ops, answer: running, choices: generateChoices(running) };
 }
 
-function generateAllRounds(): Round[] {
-  return Array.from({ length: TOTAL_ROUNDS }, () => generateRound());
-}
-
 export default function RunningTotalGame() {
   const router = useRouter();
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
   const [subPhase, setSubPhase] = useState<SubPhase>("showing-number");
-  const [rounds, setRounds] = useState<Round[]>([]);
+  const [rounds, setRounds] = useState<(Round | undefined)[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
   const [currentOpIndex, setCurrentOpIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [answerTimeLeft, setAnswerTimeLeft] = useState(ANSWER_SECONDS);
+  const [currentStage, setCurrentStage] = useState<Stage>(STAGES[0]);
+  const [answerTimeLeft, setAnswerTimeLeft] = useState(STAGES[0].answerSec);
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
-  const [speedBoosted, setSpeedBoosted] = useState(false);
 
   const [finalScore, setFinalScore] = useState(0);
   const [best, setBest] = useState<number | null>(null);
@@ -102,13 +96,10 @@ export default function RunningTotalGame() {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // stale closure 回避用 ref
-  const roundsRef = useRef<Round[]>([]);
+  const roundsRef = useRef<(Round | undefined)[]>([]);
   const currentRoundRef = useRef(0);
   const scoreRef = useRef(0);
-  const speedBoostedRef = useRef(false);
-
-  useEffect(() => { roundsRef.current = rounds; }, [rounds]);
+  const currentStageRef = useRef<Stage>(STAGES[0]);
 
   useEffect(() => {
     setBest(getPersonalBest("running-total"));
@@ -129,10 +120,11 @@ export default function RunningTotalGame() {
     };
   }, [resume]);
 
-  // answering 開始時に5秒カウントダウン開始
+  // answering 開始時に現在ステージの answerSec でカウントダウン
   useEffect(() => {
     if (subPhase !== "answering") return;
-    setAnswerTimeLeft(ANSWER_SECONDS);
+    const sec = currentStageRef.current.answerSec;
+    setAnswerTimeLeft(sec);
 
     const interval = setInterval(() => {
       setAnswerTimeLeft((prev) => {
@@ -146,26 +138,30 @@ export default function RunningTotalGame() {
   }, [subPhase]);
 
   const startOps = useCallback((roundIndex: number, opIndex: number) => {
-    if (opIndex >= OPS_COUNT) {
+    const opsCount = roundsRef.current[roundIndex]?.ops.length ?? currentStageRef.current.opsCount;
+    if (opIndex >= opsCount) {
       setSubPhase("answering");
       return;
     }
     setCurrentOpIndex(opIndex);
     setSubPhase("showing-ops");
-    const ms = speedBoostedRef.current ? FAST_OP_DISPLAY_MS : OP_DISPLAY_MS;
     timerRef.current = setTimeout(() => {
       startOps(roundIndex, opIndex + 1);
-    }, ms);
+    }, currentStageRef.current.opMs);
   }, []);
 
   const startRound = useCallback((roundIndex: number) => {
+    // ラウンド開始時に現在ステージのopsCountで問題を生成
+    const stage = currentStageRef.current;
+    const newRound = generateRound(stage.opsCount);
+    roundsRef.current[roundIndex] = newRound;
+    setRounds(prev => { const u = [...prev]; u[roundIndex] = newRound; return u; });
     setCurrentRound(roundIndex);
     currentRoundRef.current = roundIndex;
     setSubPhase("showing-number");
-    const ms = speedBoostedRef.current ? FAST_INITIAL_DISPLAY_MS : INITIAL_DISPLAY_MS;
     timerRef.current = setTimeout(() => {
       startOps(roundIndex, 0);
-    }, ms);
+    }, stage.initialMs);
   }, [startOps]);
 
   const endGame = useCallback((finalScoreValue: number) => {
@@ -180,7 +176,6 @@ export default function RunningTotalGame() {
     setPhase("result");
   }, []);
 
-  // chosen=null は時間切れ扱い（不正解）
   const handleAnswer = useCallback((chosen: number | null) => {
     if (answerIntervalRef.current) clearInterval(answerIntervalRef.current);
 
@@ -194,9 +189,10 @@ export default function RunningTotalGame() {
     setScore((prev) => {
       const newScore = isCorrect ? prev + 1 : prev;
       scoreRef.current = newScore;
-      if (newScore >= SPEED_BOOST_THRESHOLD && !speedBoostedRef.current) {
-        speedBoostedRef.current = true;
-        setSpeedBoosted(true);
+      const newStage = getStage(newScore);
+      if (newStage !== currentStageRef.current) {
+        currentStageRef.current = newStage;
+        setCurrentStage(newStage);
       }
       return newScore;
     });
@@ -213,7 +209,6 @@ export default function RunningTotalGame() {
     }, 800);
   }, [endGame, startRound]);
 
-  // 時間切れ検知（handleAnswer の最新版を ref 経由で呼ぶ）
   const handleAnswerRef = useRef(handleAnswer);
   handleAnswerRef.current = handleAnswer;
 
@@ -226,16 +221,15 @@ export default function RunningTotalGame() {
   const startGame = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (answerIntervalRef.current) clearInterval(answerIntervalRef.current);
-    const newRounds = generateAllRounds();
-    roundsRef.current = newRounds;
     scoreRef.current = 0;
-    speedBoostedRef.current = false;
-    setRounds(newRounds);
+    currentStageRef.current = STAGES[0];
+    roundsRef.current = [];
+    setRounds([]);
     setScore(0);
     setCurrentRound(0);
+    setCurrentStage(STAGES[0]);
     setFeedback(null);
     setSelectedChoice(null);
-    setSpeedBoosted(false);
     setPhase("playing");
     setTimeout(() => startRound(0), 50);
   }, [startRound]);
@@ -244,9 +238,10 @@ export default function RunningTotalGame() {
 
   const currentRoundData = rounds[currentRound];
   const currentOp = currentRoundData?.ops[currentOpIndex];
+  const opsCount = currentRoundData?.ops.length ?? currentStageRef.current.opsCount;
 
   const timerColor =
-    answerTimeLeft > 3 ? "text-white" :
+    answerTimeLeft > 2 ? "text-white" :
     answerTimeLeft > 1 ? "text-yellow-400" :
     "text-red-400";
 
@@ -266,10 +261,7 @@ export default function RunningTotalGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
-        <GameHeader
-          title="暗算ランニング"
-          description="流れる数字を頭で計算し続けよう"
-        />
+        <GameHeader title="暗算ランニング" description="流れる数字を頭で計算し続けよう" />
 
         {phase === "ready" && countdown === null && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
@@ -277,12 +269,8 @@ export default function RunningTotalGame() {
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>数字が次々と流れる！頭の中で計算し続けよう</p>
               <p>全 <span className="text-white font-bold">10問</span>、合計をタップで答えよう</p>
-              <p>回答時間: <span className="text-white font-bold">5秒</span></p>
-              {best !== null && (
-                <p className="text-[#6c63ff]">
-                  自己ベスト: <span className="font-bold">{best}問</span>
-                </p>
-              )}
+              <p>正解が増えるほど難易度が上昇！</p>
+              {best !== null && <p className="text-[#6c63ff]">自己ベスト: <span className="font-bold">{best}問</span></p>}
             </div>
             {remaining > 0 ? (
               <button onClick={startCountdown} className="btn-primary w-full text-lg">
@@ -309,12 +297,11 @@ export default function RunningTotalGame() {
               <div className="text-center">
                 <p className="text-[#64748b] text-xs">問題</p>
                 <p className="text-2xl font-black text-white">
-                  {currentRound + 1}
-                  <span className="text-[#64748b] text-base">/{TOTAL_ROUNDS}</span>
+                  {currentRound + 1}<span className="text-[#64748b] text-base">/{TOTAL_ROUNDS}</span>
                 </p>
               </div>
-              {speedBoosted && (
-                <span className="text-yellow-400 text-xs font-bold animate-pulse">⚡ 高速モード</span>
+              {currentStage.label && (
+                <span className="text-yellow-400 text-xs font-bold animate-pulse">{currentStage.label}</span>
               )}
               <div className="text-center">
                 <p className="text-[#64748b] text-xs">正解数</p>
@@ -325,18 +312,14 @@ export default function RunningTotalGame() {
             {subPhase === "showing-number" && (
               <div className="flex flex-col items-center gap-2 animate-fade-in">
                 <p className="text-[#64748b] text-sm">最初の数字</p>
-                <div className="text-7xl font-black text-white py-6">
-                  {currentRoundData.initial}
-                </div>
+                <div className="text-7xl font-black text-white py-6">{currentRoundData.initial}</div>
                 <p className="text-[#64748b] text-xs">この数字を覚えておこう</p>
               </div>
             )}
 
             {subPhase === "showing-ops" && currentOp && (
               <div key={currentOpIndex} className="flex flex-col items-center gap-2 animate-fade-in">
-                <p className="text-[#64748b] text-sm">
-                  計算 {currentOpIndex + 1}/{OPS_COUNT}
-                </p>
+                <p className="text-[#64748b] text-sm">計算 {currentOpIndex + 1}/{opsCount}</p>
                 <div className={`text-7xl font-black py-6 ${currentOp.sign === "+" ? "text-green-400" : "text-red-400"}`}>
                   {currentOp.sign}{currentOp.value}
                 </div>
