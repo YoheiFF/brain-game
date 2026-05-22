@@ -56,7 +56,6 @@ export default function CalculationGame() {
   const [input, setInput] = useState("");
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(GAME_TIME);
-  const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [best, setBest] = useState<number | null>(null);
@@ -115,22 +114,18 @@ export default function CalculationGame() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase, endGame]);
 
-  const handleSubmit = useCallback(() => {
-    if (phase !== "playing") return;
-    const val = parseInt(input, 10);
-    if (isNaN(val)) return;
-    if (val === question.answer) {
+  const handleInput = useCallback((value: string) => {
+    const cleaned = value.replace(/[^0-9-]/g, "");
+    setInput(cleaned);
+    const val = parseInt(cleaned, 10);
+    if (!isNaN(val) && val === question.answer) {
       setScore((s) => s + 1);
       setFlash(true);
       setTimeout(() => setFlash(false), 200);
       setQuestion(generateQuestion());
       setInput("");
-    } else {
-      setShake(true);
-      setTimeout(() => setShake(false), 400);
-      setInput("");
     }
-  }, [input, phase, question.answer]);
+  }, [question.answer]);
 
   const timerColor =
     timeLeft > 20 ? "text-green-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
@@ -184,28 +179,18 @@ export default function CalculationGame() {
               {question.a} {question.op} {question.b} = ?
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="w-full flex flex-col gap-3">
-              <input
-                ref={inputRef}
-                type="text"
-                inputMode="numeric"
-                enterKeyHint="go"
-                pattern="-?[0-9]*"
-                value={input}
-                onChange={(e) => setInput(e.target.value.replace(/[^0-9-]/g, ""))}
-                onBlur={() => { if (phase === "playing") setTimeout(() => inputRef.current?.focus(), 10); }}
-                className={`w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all ${shake ? "border-red-500 animate-[shake_0.3s_ease]" : "border-[#2a2a4a]"}`}
-                placeholder="答えを入力"
-                autoComplete="off"
-              />
-              <button
-                type="submit"
-                disabled={input.trim() === ""}
-                className="btn-primary w-full text-xl py-4 disabled:opacity-40"
-              >
-                決定
-              </button>
-            </form>
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="-?[0-9]*"
+              value={input}
+              onChange={(e) => handleInput(e.target.value)}
+              onBlur={() => { if (phase === "playing") setTimeout(() => inputRef.current?.focus(), 10); }}
+              className="w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 border-[#2a2a4a] rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all"
+              placeholder="答えを入力"
+              autoComplete="off"
+            />
           </div>
         )}
 
