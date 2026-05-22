@@ -3,7 +3,7 @@ import { GAME_META } from "./scores"
 
 // 20代平均スコアを10点の基準として換算
 const REFERENCE: Record<GameId, number> = {
-  calculation: 13,
+  calculation: 12.5,
   "memory-number": 7,
   stroop: 18,
   reaction: 250,
