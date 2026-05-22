@@ -16,6 +16,7 @@ const config: Config = {
         "scale-in": "scaleIn 0.2s ease-out",
         "pulse-slow": "pulse 2s infinite",
         "bounce-once": "bounceOnce 0.4s ease-out",
+        "countdown-pop": "countdownPop 0.5s ease-out",
       },
       keyframes: {
         fadeIn: {
@@ -30,6 +31,10 @@ const config: Config = {
           "0%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.15)" },
           "100%": { transform: "scale(1)" },
+        },
+        countdownPop: {
+          "0%": { transform: "scale(1.6)", opacity: "0" },
+          "100%": { transform: "scale(1)", opacity: "1" },
         },
       },
     },

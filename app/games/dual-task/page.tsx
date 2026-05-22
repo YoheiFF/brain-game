@@ -9,6 +9,8 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { useCountdown } from "@/hooks/useCountdown";
+import CountdownOverlay from "@/components/CountdownOverlay";
 
 type Phase = "ready" | "playing" | "result";
 type LeftShape = "○" | "△" | "□" | "★";
@@ -181,6 +183,8 @@ export default function DualTaskGame() {
     startTimers(STIMULUS_INTERVAL_MS, RIGHT_OFFSET_MS);
   }, [clearAllTimers, startTimers]);
 
+  const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
   const handleLeftTap = useCallback(() => {
     if (phaseRef.current !== "playing") return;
     if (leftShapeRef.current === null) return;
@@ -232,7 +236,7 @@ export default function DualTaskGame() {
       <div className="w-full max-w-sm">
         <GameHeader title="注意分割タスク" description="左は○を、右は偶数をタップしよう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && countdown === null && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">👁</div>
             <div className="text-center text-[#64748b] text-sm space-y-2">
@@ -243,7 +247,7 @@ export default function DualTaskGame() {
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}問</span></p>}
             </div>
             {remaining > 0 ? (
-              <button onClick={startGame} className="btn-primary w-full text-lg">
+              <button onClick={startCountdown} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
             ) : (
@@ -254,6 +258,8 @@ export default function DualTaskGame() {
             )}
           </div>
         )}
+
+        <CountdownOverlay count={countdown} />
 
         {phase === "playing" && (
           <div className="card p-6 flex flex-col items-center gap-4 animate-scale-in">

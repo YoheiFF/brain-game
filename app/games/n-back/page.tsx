@@ -9,6 +9,8 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { useCountdown } from "@/hooks/useCountdown";
+import CountdownOverlay from "@/components/CountdownOverlay";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -164,6 +166,8 @@ export default function NBackGame() {
     launchInterval(SPEED_STAGES[0].ms);
   }, [endGame, launchInterval]);
 
+  const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
   const handleSameButton = useCallback(() => {
     if (phaseRef.current !== "playing") return;
     if (respondedRef.current) return;
@@ -199,7 +203,7 @@ export default function NBackGame() {
       <div className="w-full max-w-sm">
         <GameHeader title="2バック課題" description="2個前と同じ数字が出たら「同じ」を押そう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && countdown === null && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🔄</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -212,7 +216,7 @@ export default function NBackGame() {
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
             </div>
             {remaining > 0 ? (
-              <button onClick={startGame} className="btn-primary w-full text-lg">
+              <button onClick={startCountdown} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
             ) : (
@@ -223,6 +227,8 @@ export default function NBackGame() {
             )}
           </div>
         )}
+
+        <CountdownOverlay count={countdown} />
 
         {phase === "playing" && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-scale-in">

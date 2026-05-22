@@ -9,6 +9,8 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { useCountdown } from "@/hooks/useCountdown";
+import CountdownOverlay from "@/components/CountdownOverlay";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -159,6 +161,8 @@ export default function TrailMakingGame() {
     }, 100);
   }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
   const handleNodeTap = useCallback((nodeId: number) => {
     const currentTarget = nextTargetRef.current;
     if (nodeId === currentTarget) {
@@ -210,7 +214,7 @@ export default function TrailMakingGame() {
       <div className="w-full max-w-sm">
         <GameHeader title="トレイルメイキング" description="1から順番にタップしよう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && countdown === null && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">✏️</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -220,7 +224,7 @@ export default function TrailMakingGame() {
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}秒</span></p>}
             </div>
             {remaining > 0 ? (
-              <button onClick={startGame} className="btn-primary w-full text-lg">
+              <button onClick={startCountdown} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
             ) : (
@@ -231,6 +235,8 @@ export default function TrailMakingGame() {
             )}
           </div>
         )}
+
+        <CountdownOverlay count={countdown} />
 
         {phase === "playing" && (
           <div className="card p-4 flex flex-col items-center gap-3 animate-scale-in">

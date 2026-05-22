@@ -9,6 +9,8 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { useCountdown } from "@/hooks/useCountdown";
+import CountdownOverlay from "@/components/CountdownOverlay";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -97,6 +99,8 @@ export default function StroopGame() {
     setPhase("playing");
   }, []);
 
+  const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
   useEffect(() => {
     if (phase !== "playing") return;
     timerRef.current = setInterval(() => {
@@ -129,7 +133,7 @@ export default function StroopGame() {
       <div className="w-full max-w-sm">
         <GameHeader title="ストループテスト" description="文字の色（インクの色）を選んでください" />
 
-        {phase === "ready" && (
+        {phase === "ready" && countdown === null && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🎨</div>
             <div className="text-center space-y-3">
@@ -142,7 +146,7 @@ export default function StroopGame() {
               {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}点</span></p>}
             </div>
             {remaining > 0 ? (
-              <button onClick={startGame} className="btn-primary w-full text-lg">
+              <button onClick={startCountdown} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
             ) : (
@@ -157,6 +161,8 @@ export default function StroopGame() {
             )}
           </div>
         )}
+
+        <CountdownOverlay count={countdown} />
 
         {phase === "playing" && (
           <div className={`card p-8 flex flex-col items-center gap-6 animate-scale-in transition-all ${

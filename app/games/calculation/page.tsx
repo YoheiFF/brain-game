@@ -9,6 +9,8 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { useCountdown } from "@/hooks/useCountdown";
+import CountdownOverlay from "@/components/CountdownOverlay";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -84,6 +86,8 @@ export default function CalculationGame() {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
+  const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
   useEffect(() => {
     setBest(getPersonalBest("calculation"));
     setRemaining(getRemainingPlays("calculation"));
@@ -136,7 +140,7 @@ export default function CalculationGame() {
       <div className="w-full max-w-sm">
         <GameHeader title="計算ゲーム" description="30秒間でできるだけ多くの計算問題を解こう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && countdown === null && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🧮</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -145,7 +149,7 @@ export default function CalculationGame() {
               {best !== null && <p className="text-[#6c63ff]">自己ベスト: <span className="font-bold">{best}問</span></p>}
             </div>
             {remaining > 0 ? (
-              <button onClick={startGame} className="btn-primary w-full text-lg">
+              <button onClick={startCountdown} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
             ) : (
@@ -160,6 +164,8 @@ export default function CalculationGame() {
             )}
           </div>
         )}
+
+        <CountdownOverlay count={countdown} />
 
         {phase === "playing" && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-scale-in">
