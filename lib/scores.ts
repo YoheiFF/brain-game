@@ -5,7 +5,7 @@ export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBet
   calculation:   { label: "計算ゲーム",     unit: "問" },
   "memory-number": { label: "数字記憶",     unit: "桁" },
   stroop:        { label: "ストループテスト", unit: "個" },
-  reaction:      { label: "反応速度テスト",  unit: "ms", lowerIsBetter: true },
+  reaction:      { label: "反応速度テスト",  unit: "点" },
   pattern:       { label: "図形記憶",       unit: "個" },
   "n-back":           { label: "Nバック課題",     unit: "点" },
   "dual-task":        { label: "注意分割タスク",   unit: "問" },

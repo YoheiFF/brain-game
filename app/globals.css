@@ -19,6 +19,7 @@ body {
   color: var(--text);
   font-family: 'Noto Sans JP', sans-serif;
   min-height: 100vh;
+  touch-action: manipulation;
 }
 
 @layer utilities {

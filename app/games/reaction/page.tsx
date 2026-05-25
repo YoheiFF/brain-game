@@ -16,13 +16,18 @@ const ROUNDS = 5;
 const MIN_WAIT = 1500;
 const MAX_WAIT = 4000;
 
+function reactionToPoints(ms: number): number {
+  return Math.min(20, Math.round((20 * 200) / ms));
+}
+
 export default function ReactionGame() {
   const router = useRouter();
   const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [round, setRound] = useState(0);
   const [times, setTimes] = useState<number[]>([]);
-  const [startTime, setStartTime] = useState(0);
+  const startTimeRef = useRef<number>(0);
+  const rafRef = useRef<number | null>(null);
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
@@ -43,12 +48,22 @@ export default function ReactionGame() {
 
   useEffect(() => { return () => { resume(); }; }, [resume]);
 
+  // 緑丸が実際に描画されたフレームで startTime を記録（iOS/Android の描画遅延を排除）
+  useEffect(() => {
+    if (phase !== "go") return;
+    rafRef.current = requestAnimationFrame(() => {
+      startTimeRef.current = performance.now();
+    });
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [phase]);
+
   const startRound = useCallback(() => {
     setPhase("waiting");
     const delay = MIN_WAIT + Math.random() * (MAX_WAIT - MIN_WAIT);
     timeoutRef.current = setTimeout(() => {
-      setStartTime(Date.now());
-      setPhase("go");
+      setPhase("go"); // startTime はフレーム描画後に設定
     }, delay);
   }, []);
 
@@ -67,25 +82,26 @@ export default function ReactionGame() {
     }
     if (phase !== "go") return;
 
-    const elapsed = Date.now() - startTime;
+    const elapsed = Math.round(performance.now() - startTimeRef.current);
     const newTimes = [...times, elapsed];
     setTimes(newTimes);
 
     if (round >= ROUNDS) {
       const avg = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
       setAvgTime(avg);
-      const newBest = saveScore("reaction", avg, getNickname() ?? "ゲスト", getOrInitUserId());
-      recordPlay("reaction", avg);
+      const points = reactionToPoints(avg);
+      const newBest = saveScore("reaction", points, getNickname() ?? "ゲスト", getOrInitUserId());
+      recordPlay("reaction", points);
       setRemaining(getRemainingPlays("reaction"));
       setBest(newBest);
-      setIsNewBest(newBest === avg);
+      setIsNewBest(newBest === points);
       setPhase("result");
     } else {
       setRound((r) => r + 1);
       setTimeout(() => startRound(), 800);
       setPhase("waiting");
     }
-  }, [phase, startTime, times, round, startRound]);
+  }, [phase, times, round, startRound]);
 
   const bgColor =
     phase === "waiting" ? "bg-red-900/30 border-red-800" :
@@ -105,7 +121,7 @@ export default function ReactionGame() {
               <p>画面が<span className="text-green-400 font-bold">緑</span>になったらすぐにタップ！</p>
               <p>赤い間はタップしないでください</p>
               <p>{ROUNDS}回の平均タイムを計測します</p>
-              {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}ms</span> (低いほど良い)</p>}
+              {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}点</span></p>}
             </div>
             {remaining > 0 ? (
               <button onClick={startGame} className="btn-primary w-full text-lg">
@@ -127,7 +143,7 @@ export default function ReactionGame() {
         {(phase === "waiting" || phase === "go" || phase === "tooEarly") && (
           <div
             className={`card p-8 flex flex-col items-center gap-6 cursor-pointer select-none transition-all duration-150 border-2 ${bgColor}`}
-            onClick={handleTap}
+            onPointerDown={handleTap}
           >
             <div className="flex justify-between w-full">
               <span className="text-[#64748b] text-sm">ラウンド {round} / {ROUNDS}</span>
@@ -171,14 +187,13 @@ export default function ReactionGame() {
 
         {phase === "result" && (
           <ResultModal
-            score={avgTime}
+            score={reactionToPoints(avgTime)}
             best={best}
-            unit="ms"
+            unit="点"
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
-            lowerIsBetter
-            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("reaction", age); return { ...b, unit: "ms", lowerIsBetter: true }; })()}
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("reaction", age); return { ...b, unit: "点" }; })()}
             gameId="reaction"
           />
         )}
