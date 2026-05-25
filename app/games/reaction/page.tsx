@@ -17,7 +17,8 @@ const MIN_WAIT = 1500;
 const MAX_WAIT = 4000;
 
 function reactionToPoints(ms: number): number {
-  return Math.min(20, Math.round((20 * 200) / ms));
+  if (ms <= 200) return 20;
+  return Math.max(0, 20 - Math.floor((ms - 200) / 10));
 }
 
 export default function ReactionGame() {
