@@ -2,7 +2,6 @@ import type { GameId } from "./scores"
 import { GAME_IDS, GAME_META } from "./scores"
 
 export const MAX_PLAYS_PER_DAY = 3
-export const MAX_REWARDED_PLAYS_PER_DAY = 3
 
 const KEY_DAILY = "braingame_daily"
 
@@ -38,16 +37,18 @@ export function getPlayCount(gameId: GameId): number {
   return loadDaily().plays[gameId] ?? 0
 }
 
+export function isUnlocked(gameId: GameId): boolean {
+  return (loadDaily().rewardedPlays?.[gameId] ?? 0) >= 1
+}
+
 export function getRemainingPlays(gameId: GameId): number {
-  const record = loadDaily()
-  const totalPlays = record.plays[gameId] ?? 0
-  const rewardedEarned = record.rewardedPlays?.[gameId] ?? 0
-  return Math.max(0, MAX_PLAYS_PER_DAY + rewardedEarned - totalPlays)
+  if (isUnlocked(gameId)) return 999
+  const totalPlays = loadDaily().plays[gameId] ?? 0
+  return Math.max(0, MAX_PLAYS_PER_DAY - totalPlays)
 }
 
 export function getRewardedRemaining(gameId: GameId): number {
-  const used = loadDaily().rewardedPlays?.[gameId] ?? 0
-  return Math.max(0, MAX_REWARDED_PLAYS_PER_DAY - used)
+  return isUnlocked(gameId) ? 0 : 1
 }
 
 export function recordRewardedPlay(gameId: GameId): void {
