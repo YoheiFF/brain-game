@@ -37,18 +37,15 @@ export function getPlayCount(gameId: GameId): number {
   return loadDaily().plays[gameId] ?? 0
 }
 
-export function isUnlocked(gameId: GameId): boolean {
-  return (loadDaily().rewardedPlays?.[gameId] ?? 0) >= 1
-}
-
 export function getRemainingPlays(gameId: GameId): number {
-  if (isUnlocked(gameId)) return 999
-  const totalPlays = loadDaily().plays[gameId] ?? 0
-  return Math.max(0, MAX_PLAYS_PER_DAY - totalPlays)
+  const record = loadDaily()
+  const totalPlays = record.plays[gameId] ?? 0
+  const rewardedEarned = record.rewardedPlays?.[gameId] ?? 0
+  return Math.max(0, MAX_PLAYS_PER_DAY + rewardedEarned - totalPlays)
 }
 
 export function getRewardedRemaining(gameId: GameId): number {
-  return isUnlocked(gameId) ? 0 : 1
+  return 1 // 広告視聴回数に上限なし
 }
 
 export function recordRewardedPlay(gameId: GameId): void {
