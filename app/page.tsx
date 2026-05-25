@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getAllPersonalBests, type GameId, GAME_IDS } from "@/lib/scores";
+import { getAllPersonalBests, migrateReactionScore, type GameId, GAME_IDS } from "@/lib/scores";
 import { calcGamePoints } from "@/lib/game-points";
 import { getNickname, hasNickname, getAge, getUserId } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
@@ -16,12 +16,13 @@ const GAMES: {
   icon: string;
   color: string;
   unit: string;
+  benchmarkUnit?: string;
   lowerIsBetter?: boolean;
 }[] = [
   { id: "calculation",    title: "計算ゲーム",     description: "30秒間で四則演算を解け！",       icon: "🧮", color: "from-violet-600 to-purple-700", unit: "問" },
   { id: "memory-number",  title: "数字記憶",       description: "数列を覚えて正確に入力しよう",   icon: "🔢", color: "from-blue-600 to-cyan-600",     unit: "桁" },
   { id: "stroop",         title: "ストループ", description: "文字の色に惑わされるな！",       icon: "🎨", color: "from-pink-600 to-rose-600",     unit: "個" },
-  { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "ms", lowerIsBetter: true },
+  { id: "reaction",       title: "反応速度テスト",  description: "光ったらすぐにタップ！",         icon: "⚡", color: "from-yellow-500 to-orange-600",  unit: "点", benchmarkUnit: "ms" },
   { id: "pattern",        title: "図形記憶",       description: "光ったマスのパターンを記憶せよ", icon: "🧩", color: "from-green-600 to-teal-600",    unit: "個" },
   { id: "n-back",          title: "2バック課題",      description: "2個前と同じ数字か判断せよ！",      icon: "🔄", color: "from-indigo-600 to-blue-700",   unit: "点" },
   { id: "dual-task",       title: "注意分割タスク",    description: "左右の刺激に同時に反応しよう",      icon: "👁", color: "from-cyan-600 to-teal-600",     unit: "問" },
@@ -45,6 +46,7 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+    migrateReactionScore();
     setBests(getAllPersonalBests());
     const nick = getNickname();
     setNickname(nick);
@@ -161,7 +163,7 @@ export default function Home() {
                 return (
                   <div className="flex items-center gap-1">
                     <span className="text-[#64748b] text-xs">📊 {ageGroup}平均</span>
-                    <span className="text-[#94a3b8] font-bold text-sm">{average}{game.unit}</span>
+                    <span className="text-[#94a3b8] font-bold text-sm">{average}{game.benchmarkUnit ?? game.unit}</span>
                   </div>
                 );
               })()}

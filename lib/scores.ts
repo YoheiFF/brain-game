@@ -188,6 +188,26 @@ export function getUserOverallRankEntry(_nickname: string): OverallEntry | null 
   return null;
 }
 
+/** 反応速度の旧スコア（ms値）を点数に移行する（初回ロード時に1回呼ぶ） */
+export function migrateReactionScore(): void {
+  if (typeof window === "undefined") return;
+  const personal = loadPersonal();
+  if (personal.reaction !== undefined && personal.reaction > 20) {
+    const ms = personal.reaction;
+    personal.reaction = ms <= 200 ? 20 : Math.max(0, 20 - Math.floor((ms - 200) / 10));
+    savePersonal(personal);
+  }
+  const rankings = loadRankings();
+  const list = rankings.reaction ?? [];
+  rankings.reaction = list.map((e) => ({
+    ...e,
+    score: e.score > 20
+      ? (e.score <= 200 ? 20 : Math.max(0, 20 - Math.floor((e.score - 200) / 10)))
+      : e.score,
+  }));
+  saveRankings(rankings);
+}
+
 /** 全ゲームの累計プレイ回数を返す */
 export function getTotalPlayCount(): number {
   const rankings = loadRankings()
