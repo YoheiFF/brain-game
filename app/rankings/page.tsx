@@ -25,8 +25,8 @@ export default function RankingsPage() {
   const [myGameEntries, setMyGameEntries] = useState<Partial<Record<GameId, RankEntry>>>({});
   const [myOverallEntry, setMyOverallEntry] = useState<OverallEntry | null>(null);
 
-  // 30秒ポーリング（ランキング画面のみ有効）
-  const { data: syncData, loading } = useDbSync({ interval: 30000 });
+  // 画面を開いたときに1回だけ取得（ポーリングなし）
+  const { data: syncData, loading } = useDbSync({ interval: null });
 
   useEffect(() => {
     setMyNick(getNickname());
