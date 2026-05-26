@@ -64,6 +64,29 @@ export async function getDb(): Promise<Client> {
       "CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships(addressee_id)"
     );
 
+    // --- マイグレーション: referral_bonus カラム ---
+    try {
+      await client.execute(
+        "ALTER TABLE users ADD COLUMN referral_bonus INTEGER NOT NULL DEFAULT 0"
+      );
+    } catch {
+      // "duplicate column name" は無視（既に存在する）
+    }
+
+    // --- マイグレーション: referrals テーブル ---
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id          TEXT PRIMARY KEY,
+        referrer_id TEXT NOT NULL,
+        referred_id TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        UNIQUE(referred_id)
+      )
+    `);
+    await client.execute(
+      "CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id)"
+    );
+
     migrationDone = true;
   }
 

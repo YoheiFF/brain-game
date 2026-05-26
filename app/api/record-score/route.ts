@@ -23,7 +23,7 @@ const SCORE_LIMITS: Record<GameId, { min: number; max: number }> = {
   "running-total":   { min: 0, max: 10   },
 };
 
-const MAX_PLAYS_PER_DAY = 6; // 3 base + 3 rewarded
+const MAX_PLAYS_PER_DAY = 3; // 通常プレイ上限（フリーポイント分は可変）
 
 // ── CORS（/api/sync/route.ts と同一パターン） ────────────────────
 const ALLOWED_ORIGINS = [
@@ -65,10 +65,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { userId, gameId, score } = body as {
+  const { userId, gameId, score, freePointsUsed } = body as {
     userId?: unknown;
     gameId?: unknown;
     score?: unknown;
+    freePointsUsed?: unknown;
   };
 
   // バリデーション: userId
@@ -120,7 +121,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const currentPlayCount = playResult.rows[0]
       ? (playResult.rows[0].play_count as number)
       : 0;
-    if (currentPlayCount >= MAX_PLAYS_PER_DAY) {
+    const isFreePointsUsed = freePointsUsed === true;
+    const effectiveLimit = MAX_PLAYS_PER_DAY + (isFreePointsUsed ? 1 : 0);
+    if (currentPlayCount >= effectiveLimit) {
       return NextResponse.json(
         { success: false, error: "daily play limit exceeded" },
         { status: 429, headers: corsHeaders }

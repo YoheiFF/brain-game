@@ -70,7 +70,8 @@ export function saveScore(
   gameId: GameId,
   score: number,
   nickname: string,
-  userId?: string // DB 保存用（undefined の場合は localStorage のみ）
+  userId?: string, // DB 保存用（undefined の場合は localStorage のみ）
+  freePointsUsed?: boolean // フリーポイント使用フラグ（省略時は false 扱い）
 ): number {
   const { lowerIsBetter } = GAME_META[gameId];
 
@@ -98,7 +99,7 @@ export function saveScore(
     fetch("/api/record-score", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, gameId, score }),
+      body: JSON.stringify({ userId, gameId, score, freePointsUsed: freePointsUsed ?? false }),
     }).catch((e) => {
       console.warn("[saveScore] record-score API failed:", e);
     });

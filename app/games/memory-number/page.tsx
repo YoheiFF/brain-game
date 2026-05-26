@@ -6,7 +6,7 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
-import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 
@@ -29,16 +29,17 @@ export default function MemoryNumberGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
-  const [rewardedRemaining, setRewardedRemaining] = useState(0);
+  const [freePoints, setFreePoints] = useState(0);
   const [showIndex, setShowIndex] = useState(-1);
   const [inputTimeLeft, setInputTimeLeft] = useState(0);
   const inputTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameEndedRef = useRef(false);
+  const isFreePointPlayRef = useRef(false);
 
   useEffect(() => {
     setBest(getPersonalBest("memory-number"));
     setRemaining(getRemainingPlays("memory-number"));
-    setRewardedRemaining(getRewardedRemaining("memory-number"));
+    setFreePoints(getFreePoints());
   }, []);
 
   useEffect(() => {
@@ -87,13 +88,16 @@ export default function MemoryNumberGame() {
             if (gameEndedRef.current) return;
             gameEndedRef.current = true;
             setSequence((seq) => {
-              const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId());
+              const isFreePointsUsed = isFreePointPlayRef.current;
+              isFreePointPlayRef.current = false;
+              const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
               setBest(newBest);
               setIsNewBest(newBest === level);
               return seq;
             });
             recordPlay("memory-number", level);
             setRemaining(getRemainingPlays("memory-number"));
+            setFreePoints(getFreePoints());
             setPhase("result");
           }, 1200);
           return 0;
@@ -118,9 +122,12 @@ export default function MemoryNumberGame() {
         setTimeout(() => {
           if (gameEndedRef.current) return;
           gameEndedRef.current = true;
-          const newBest = saveScore("memory-number", MAX_LEVEL, getNickname() ?? "ゲスト", getOrInitUserId());
+          const isFreePointsUsed = isFreePointPlayRef.current;
+          isFreePointPlayRef.current = false;
+          const newBest = saveScore("memory-number", MAX_LEVEL, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
           recordPlay("memory-number", MAX_LEVEL);
           setRemaining(getRemainingPlays("memory-number"));
+          setFreePoints(getFreePoints());
           setBest(newBest);
           setIsNewBest(newBest === MAX_LEVEL);
           setPhase("result");
@@ -137,9 +144,12 @@ export default function MemoryNumberGame() {
       setTimeout(() => {
         if (gameEndedRef.current) return;
         gameEndedRef.current = true;
-        const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId());
+        const isFreePointsUsed = isFreePointPlayRef.current;
+        isFreePointPlayRef.current = false;
+        const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
         recordPlay("memory-number", level);
         setRemaining(getRemainingPlays("memory-number"));
+        setFreePoints(getFreePoints());
         setBest(newBest);
         setIsNewBest(newBest === level);
         setPhase("result");
@@ -165,15 +175,15 @@ export default function MemoryNumberGame() {
               <button onClick={startGame} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
+            ) : freePoints > 0 ? (
+              <button
+                onClick={() => { consumeFreePoint(); isFreePointPlayRef.current = true; setFreePoints(getFreePoints()); startGame(); }}
+                className="btn-primary w-full text-lg"
+              >
+                フリーポイントを使用してプレイ（残り{freePoints}pt）
+              </button>
             ) : (
-              <WatchAdButton
-                gameId="memory-number"
-                rewardedRemaining={rewardedRemaining}
-                onRewarded={() => {
-                  setRemaining(getRemainingPlays("memory-number"));
-                  setRewardedRemaining(getRewardedRemaining("memory-number"));
-                }}
-              />
+              <WatchAdButton onRewarded={() => { setFreePoints(getFreePoints()); }} />
             )}
           </div>
         )}

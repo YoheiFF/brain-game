@@ -1,12 +1,12 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
-import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 
@@ -33,14 +33,15 @@ export default function PatternGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
-  const [rewardedRemaining, setRewardedRemaining] = useState(0);
+  const [freePoints, setFreePoints] = useState(0);
   const [score, setScore] = useState(0);
   const [wrongCells, setWrongCells] = useState<Set<number>>(new Set());
+  const isFreePointPlayRef = useRef(false);
 
   useEffect(() => {
     setBest(getPersonalBest("pattern"));
     setRemaining(getRemainingPlays("pattern"));
-    setRewardedRemaining(getRewardedRemaining("pattern"));
+    setFreePoints(getFreePoints());
   }, []);
 
   useEffect(() => {
@@ -95,9 +96,12 @@ export default function PatternGame() {
       setWrongCells(wrong);
       setPhase("wrong");
       setTimeout(() => {
-        const newBest = saveScore("pattern", score, getNickname() ?? "ゲスト", getOrInitUserId());
+        const isFreePointsUsed = isFreePointPlayRef.current;
+        isFreePointPlayRef.current = false;
+        const newBest = saveScore("pattern", score, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
         recordPlay("pattern", score);
         setRemaining(getRemainingPlays("pattern"));
+        setFreePoints(getFreePoints());
         setBest(newBest);
         setIsNewBest(newBest === score && score > 0);
         setPhase("result");
@@ -124,15 +128,15 @@ export default function PatternGame() {
               <button onClick={startGame} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
+            ) : freePoints > 0 ? (
+              <button
+                onClick={() => { consumeFreePoint(); isFreePointPlayRef.current = true; setFreePoints(getFreePoints()); startGame(); }}
+                className="btn-primary w-full text-lg"
+              >
+                フリーポイントを使用してプレイ（残り{freePoints}pt）
+              </button>
             ) : (
-              <WatchAdButton
-                gameId="pattern"
-                rewardedRemaining={rewardedRemaining}
-                onRewarded={() => {
-                  setRemaining(getRemainingPlays("pattern"));
-                  setRewardedRemaining(getRewardedRemaining("pattern"));
-                }}
-              />
+              <WatchAdButton onRewarded={() => { setFreePoints(getFreePoints()); }} />
             )}
           </div>
         )}

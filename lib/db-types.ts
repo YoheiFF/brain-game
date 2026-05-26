@@ -39,6 +39,7 @@ export interface SyncResponse {
   dailyHistory: never[];
   myGameRanks: Partial<Record<GameId, RankEntry>>;
   myOverallRank: OverallEntry | null;
+  referralBonus: number;
 }
 
 // フレンドシップのステータス

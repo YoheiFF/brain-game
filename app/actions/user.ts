@@ -52,6 +52,7 @@ export interface RecordScoreInput {
   userId: string;
   gameId: GameId;
   score: number;
+  freePointsUsed?: boolean;
 }
 
 export interface ActionResult {
@@ -134,7 +135,9 @@ export async function recordScore(input: RecordScoreInput): Promise<ActionResult
     const currentPlayCount = playResult.rows[0]
       ? (playResult.rows[0].play_count as number)
       : 0;
-    if (currentPlayCount >= MAX_PLAYS_PER_DAY) {
+    const isFreePointsUsed = input.freePointsUsed === true;
+    const effectiveLimit = MAX_PLAYS_PER_DAY + (isFreePointsUsed ? 1 : 0);
+    if (currentPlayCount >= effectiveLimit) {
       return { success: false, error: "daily play limit exceeded" };
     }
 

@@ -6,8 +6,11 @@ import { calcGamePoints } from "@/lib/game-points";
 import { getNickname, hasNickname, getAge, getUserId } from "@/lib/nickname";
 import NicknameModal from "@/components/NicknameModal";
 import { getBenchmark } from "@/lib/benchmarks";
-import { getAllRemainingPlays, MAX_PLAYS_PER_DAY } from "@/lib/daily";
+import { getAllRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, addFreePoint, addFreePoints } from "@/lib/daily";
+import { showRewardedAd } from "@/lib/admob";
 import { useDbSync } from "@/hooks/useDbSync";
+
+const APP_URL = "https://brain-game-opal.vercel.app";
 
 const GAMES: {
   id: GameId;
@@ -36,6 +39,31 @@ export default function Home() {
   const [nickname, setNickname] = useState<string | null>(null);
   const [age, setAge] = useState<number | null>(null);
   const [remainingPlays, setRemainingPlays] = useState<Partial<Record<GameId, number>>>({});
+  const [freePoints, setFreePoints] = useState(0);
+  const [adLoading, setAdLoading] = useState(false);
+  const [adFailed, setAdFailed] = useState(false);
+
+  const handleReferralShare = () => {
+    const uid = getUserId();
+    if (!uid) return;
+    const shareUrl = `${APP_URL}/?ref=${uid}`;
+    const shareText = `🧠 BrainGameで脳トレしよう！\n友達招待で私に+10pt！\n${shareUrl}`;
+    const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(shareText)}`;
+    window.open(lineUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleWatchAd = async () => {
+    setAdLoading(true);
+    setAdFailed(false);
+    const rewarded = await showRewardedAd();
+    if (rewarded) {
+      addFreePoint();
+      setFreePoints(getFreePoints());
+    } else {
+      setAdFailed(true);
+    }
+    setAdLoading(false);
+  };
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [modalMode, setModalMode] = useState<"setup" | "change">("setup");
   const [mounted, setMounted] = useState(false);
@@ -46,12 +74,25 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+
+    // ?ref= パラメータの処理（被紹介者フロー）
+    const urlParams = new URLSearchParams(window.location.search);
+    const refParam = urlParams.get("ref");
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (refParam && UUID_RE.test(refParam)) {
+      sessionStorage.setItem("braingame_ref", refParam);
+      // URLからrefパラメータを除去（リロード時の再処理防止）
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState(null, "", cleanUrl);
+    }
+
     migrateReactionScore();
     setBests(getAllPersonalBests());
     const nick = getNickname();
     setNickname(nick);
     setAge(getAge());
     setRemainingPlays(getAllRemainingPlays());
+    setFreePoints(getFreePoints());
     if (!hasNickname()) {
       setModalMode("setup");
       setShowNicknameModal(true);
@@ -71,19 +112,46 @@ export default function Home() {
   useEffect(() => {
     if (!syncData) return;
     setBests(syncData.personalBests);
-    // dailyPlays を remainingPlays に変換
     const remaining: Partial<Record<GameId, number>> = {};
     for (const id of GAME_IDS) {
       const play = syncData.dailyPlays[id];
       remaining[id] = Math.max(0, MAX_PLAYS_PER_DAY - (play?.playCount ?? 0));
     }
     setRemainingPlays(remaining);
+    // referralBonus があればlocalStorageに加算してDBをリセット
+    if (syncData.referralBonus > 0) {
+      addFreePoints(syncData.referralBonus);
+      setFreePoints(getFreePoints());
+      const uid = getUserId();
+      if (uid) {
+        fetch("/api/referral/consume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: uid }),
+        }).catch(() => {});
+      }
+    }
   }, [syncData]);
 
   const handleNicknameClose = (nick: string) => {
     setNickname(nick);
     setAge(getAge());
     setShowNicknameModal(false);
+    // 新規登録（setup）のみ紹介ポイント付与を試みる
+    if (modalMode === "setup") {
+      const ref = sessionStorage.getItem("braingame_ref");
+      if (ref) {
+        const myId = getUserId();
+        if (myId) {
+          fetch("/api/referral/redeem", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ referrerId: ref, newUserId: myId }),
+          }).catch(() => {});
+        }
+        sessionStorage.removeItem("braingame_ref");
+      }
+    }
   };
 
   if (!mounted) return null;
@@ -143,6 +211,34 @@ export default function Home() {
         </Link>
       </div>
 
+      {/* フリーポイント表示 */}
+      <div className="mb-4 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl animate-fade-in">
+        <div className="flex items-center gap-2">
+          <span className="text-blue-400 text-lg">🎫</span>
+          <span className="text-blue-400 text-sm font-bold">フリーポイント</span>
+          <span className="text-[#64748b] text-xs">（3回プレイ後に使用可）</span>
+          <span className="ml-auto text-blue-400 font-black text-xl">{freePoints}<span className="text-sm font-bold ml-0.5">pt</span></span>
+        </div>
+        <button
+          onClick={handleWatchAd}
+          disabled={adLoading}
+          className="mt-2 w-full text-sm font-bold py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 transition-all disabled:opacity-50"
+        >
+          {adLoading ? "広告読み込み中..." : "📺 広告を見てフリーポイント+1"}
+        </button>
+        {adFailed && (
+          <p className="text-[#64748b] text-xs text-center mt-1">広告を読み込めませんでした。もう一度お試しください。</p>
+        )}
+        {nickname && (
+          <button
+            onClick={handleReferralShare}
+            className="mt-2 w-full text-sm font-bold py-2 rounded-xl bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-300 transition-all"
+          >
+            📤 友達を招待して+10pt
+          </button>
+        )}
+      </div>
+
       {/* ゲームカード */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {GAMES.map((game, i) => (
@@ -195,13 +291,18 @@ export default function Home() {
               {(() => {
                 const remaining = remainingPlays[game.id] ?? MAX_PLAYS_PER_DAY
                 return (
-                  <div className="flex items-center gap-1 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className={`text-xs font-bold ${
                       remaining === 0 ? "text-red-400" :
                       remaining === 1 ? "text-yellow-400" : "text-green-400"
                     }`}>
                       {remaining === 0 ? "本日上限" : `残り${remaining}回`}
                     </span>
+                    {remaining === 0 && freePoints > 0 && (
+                      <span className="text-xs font-bold text-blue-400">
+                        フリーポイント {freePoints}pt
+                      </span>
+                    )}
                   </div>
                 )
               })()}

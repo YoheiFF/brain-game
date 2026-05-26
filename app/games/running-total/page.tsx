@@ -6,7 +6,7 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
-import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -92,7 +92,7 @@ export default function RunningTotalGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
-  const [rewardedRemaining, setRewardedRemaining] = useState(0);
+  const [freePoints, setFreePoints] = useState(0);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -100,11 +100,12 @@ export default function RunningTotalGame() {
   const currentRoundRef = useRef(0);
   const scoreRef = useRef(0);
   const currentStageRef = useRef<Stage>(STAGES[0]);
+  const isFreePointPlayRef = useRef(false);
 
   useEffect(() => {
     setBest(getPersonalBest("running-total"));
     setRemaining(getRemainingPlays("running-total"));
-    setRewardedRemaining(getRewardedRemaining("running-total"));
+    setFreePoints(getFreePoints());
   }, []);
 
   useEffect(() => {
@@ -168,9 +169,12 @@ export default function RunningTotalGame() {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (answerIntervalRef.current) clearInterval(answerIntervalRef.current);
     setFinalScore(finalScoreValue);
-    const newBest = saveScore("running-total", finalScoreValue, getNickname() ?? "ゲスト", getOrInitUserId());
+    const isFreePointsUsed = isFreePointPlayRef.current;
+    isFreePointPlayRef.current = false;
+    const newBest = saveScore("running-total", finalScoreValue, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
     recordPlay("running-total", finalScoreValue);
     setRemaining(getRemainingPlays("running-total"));
+    setFreePoints(getFreePoints());
     setBest(newBest);
     setIsNewBest(newBest === finalScoreValue && finalScoreValue > 0);
     setPhase("result");
@@ -276,15 +280,15 @@ export default function RunningTotalGame() {
               <button onClick={startCountdown} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
+            ) : freePoints > 0 ? (
+              <button
+                onClick={() => { consumeFreePoint(); isFreePointPlayRef.current = true; setFreePoints(getFreePoints()); startCountdown(); }}
+                className="btn-primary w-full text-lg"
+              >
+                フリーポイントを使用してプレイ（残り{freePoints}pt）
+              </button>
             ) : (
-              <WatchAdButton
-                gameId="running-total"
-                rewardedRemaining={rewardedRemaining}
-                onRewarded={() => {
-                  setRemaining(getRemainingPlays("running-total"));
-                  setRewardedRemaining(getRewardedRemaining("running-total"));
-                }}
-              />
+              <WatchAdButton onRewarded={() => { setFreePoints(getFreePoints()); }} />
             )}
           </div>
         )}

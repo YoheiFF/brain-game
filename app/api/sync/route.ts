@@ -6,6 +6,7 @@ import {
   getDailyPlaysFromDb,
 } from "@/lib/db-scores";
 import type { SyncResponse } from "@/lib/db-types";
+import { getDb } from "@/lib/db";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -23,6 +24,20 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
+}
+
+async function getReferralBonusFromDb(userId: string): Promise<number> {
+  try {
+    const db = await getDb();
+    const result = await db.execute({
+      sql: "SELECT referral_bonus FROM users WHERE id = ?",
+      args: [userId],
+    });
+    if (result.rows.length === 0) return 0;
+    return (result.rows[0].referral_bonus as number) ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function OPTIONS(request: NextRequest): Promise<NextResponse> {
@@ -52,12 +67,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const [personalBests, rankings, myRanks, dailyPlays] =
+    const [personalBests, rankings, myRanks, dailyPlays, referralBonus] =
       await Promise.all([
         getPersonalBestsFromDb(userId),
         getRankingsFromDb(),
         getUserRanksFromDb(userId),
         getDailyPlaysFromDb(userId),
+        getReferralBonusFromDb(userId),
       ]);
 
     const body: SyncResponse = {
@@ -68,6 +84,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       myOverallRank: myRanks.overallRank,
       dailyPlays,
       dailyHistory: [],
+      referralBonus,
     };
 
     return NextResponse.json(body, {

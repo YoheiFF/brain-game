@@ -6,7 +6,7 @@ import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
 import { getNickname, getAge, getOrInitUserId } from "@/lib/nickname";
 import { getBenchmark } from "@/lib/benchmarks";
-import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getRewardedRemaining } from "@/lib/daily";
+import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 
@@ -32,14 +32,15 @@ export default function ReactionGame() {
   const [best, setBest] = useState<number | null>(null);
   const [isNewBest, setIsNewBest] = useState(false);
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
-  const [rewardedRemaining, setRewardedRemaining] = useState(0);
+  const [freePoints, setFreePoints] = useState(0);
   const [avgTime, setAvgTime] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFreePointPlayRef = useRef(false);
 
   useEffect(() => {
     setBest(getPersonalBest("reaction"));
     setRemaining(getRemainingPlays("reaction"));
-    setRewardedRemaining(getRewardedRemaining("reaction"));
+    setFreePoints(getFreePoints());
   }, []);
 
   useEffect(() => {
@@ -91,9 +92,12 @@ export default function ReactionGame() {
       const avg = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
       setAvgTime(avg);
       const points = reactionToPoints(avg);
-      const newBest = saveScore("reaction", points, getNickname() ?? "ゲスト", getOrInitUserId());
+      const isFreePointsUsed = isFreePointPlayRef.current;
+      isFreePointPlayRef.current = false;
+      const newBest = saveScore("reaction", points, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
       recordPlay("reaction", points);
       setRemaining(getRemainingPlays("reaction"));
+      setFreePoints(getFreePoints());
       setBest(newBest);
       setIsNewBest(newBest === points);
       setPhase("result");
@@ -128,15 +132,15 @@ export default function ReactionGame() {
               <button onClick={startGame} className="btn-primary w-full text-lg">
                 スタート（残り{remaining}回）
               </button>
+            ) : freePoints > 0 ? (
+              <button
+                onClick={() => { consumeFreePoint(); isFreePointPlayRef.current = true; setFreePoints(getFreePoints()); startGame(); }}
+                className="btn-primary w-full text-lg"
+              >
+                フリーポイントを使用してプレイ（残り{freePoints}pt）
+              </button>
             ) : (
-              <WatchAdButton
-                gameId="reaction"
-                rewardedRemaining={rewardedRemaining}
-                onRewarded={() => {
-                  setRemaining(getRemainingPlays("reaction"));
-                  setRewardedRemaining(getRewardedRemaining("reaction"));
-                }}
-              />
+              <WatchAdButton onRewarded={() => { setFreePoints(getFreePoints()); }} />
             )}
           </div>
         )}
