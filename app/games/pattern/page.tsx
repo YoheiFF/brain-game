@@ -148,22 +148,24 @@ export default function PatternGame() {
               <span className="text-[#64748b] text-sm">スコア: <span className="text-white font-bold">{score}</span></span>
             </div>
 
-            {phase === "showing" && (
-              <p className="text-[#64748b] text-sm animate-pulse">
-                覚えてください... ({patternCount}マス)
-              </p>
-            )}
-            {phase === "input" && (
-              <p className="text-[#64748b] text-sm">
-                {patternCount}マスを選択してください ({selected.size}/{patternCount})
-              </p>
-            )}
-            {phase === "correct" && (
-              <p className="text-green-400 font-bold animate-bounce-once">✅ 正解！</p>
-            )}
-            {phase === "wrong" && (
-              <p className="text-red-400 font-bold">❌ 不正解...</p>
-            )}
+            <div className="h-5 flex items-center justify-center">
+              {phase === "showing" && (
+                <p className="text-[#64748b] text-sm animate-pulse">
+                  覚えてください... ({patternCount}マス)
+                </p>
+              )}
+              {phase === "input" && (
+                <p className="text-[#64748b] text-sm">
+                  {patternCount}マスを選択してください ({selected.size}/{patternCount})
+                </p>
+              )}
+              {phase === "correct" && (
+                <p className="text-green-400 text-sm font-bold animate-bounce-once">✅ 正解！</p>
+              )}
+              {phase === "wrong" && (
+                <p className="text-red-400 text-sm font-bold">❌ 不正解...</p>
+              )}
+            </div>
 
             <div
               className="grid gap-2"
@@ -205,15 +207,13 @@ export default function PatternGame() {
               })}
             </div>
 
-            {phase === "input" && (
-              <button
-                onClick={handleSubmit}
-                disabled={selected.size !== patternCount}
-                className="btn-primary w-full disabled:opacity-40"
-              >
-                決定 ({selected.size}/{patternCount})
-              </button>
-            )}
+            <button
+              onClick={handleSubmit}
+              disabled={phase !== "input" || selected.size !== patternCount}
+              className={`btn-primary w-full disabled:opacity-40 ${phase !== "input" ? "invisible pointer-events-none" : ""}`}
+            >
+              決定 ({selected.size}/{patternCount})
+            </button>
           </div>
         )}
 
