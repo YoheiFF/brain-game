@@ -108,6 +108,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       args: [referrerId],
     });
 
+    // 紹介者と被紹介者を自動フレンド登録（accepted）
+    const existingFriendship = await db.execute({
+      sql: "SELECT id, status FROM friendships WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)",
+      args: [referrerId, newUserId, newUserId, referrerId],
+    });
+
+    if (existingFriendship.rows.length === 0) {
+      await db.execute({
+        sql: "INSERT INTO friendships (requester_id, addressee_id, status, created_at, updated_at) VALUES (?, ?, 'accepted', ?, ?)",
+        args: [referrerId, newUserId, now, now],
+      });
+    } else if (existingFriendship.rows[0].status !== "accepted") {
+      await db.execute({
+        sql: "UPDATE friendships SET status = 'accepted', updated_at = ? WHERE id = ?",
+        args: [now, existingFriendship.rows[0].id],
+      });
+    }
+
     return NextResponse.json(
       { success: true, message: "referral bonus awarded" },
       { status: 200, headers: corsHeaders }

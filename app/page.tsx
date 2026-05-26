@@ -46,7 +46,7 @@ export default function Home() {
   const handleReferralShare = () => {
     const uid = getUserId();
     if (!uid) return;
-    const shareUrl = `${APP_URL}/?ref=${uid}`;
+    const shareUrl = `${APP_URL}/?ref=${uid}&openExternalBrowser=1`;
     const shareText = `🧠 BrainGameで脳トレしよう！\n友達招待で私に+10pt！\n${shareUrl}`;
     const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(shareText)}`;
     window.open(lineUrl, "_blank", "noopener,noreferrer");
