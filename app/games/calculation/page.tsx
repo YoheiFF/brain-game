@@ -48,6 +48,8 @@ function generateQuestion(): Question {
 
 const GAME_TIME = 30;
 
+const NUMPAD_KEYS = ["1","2","3","4","5","6","7","8","9"] as const;
+
 export default function CalculationGame() {
   const router = useRouter();
   const { pause, resume } = useBGM();
@@ -63,8 +65,8 @@ export default function CalculationGame() {
   const [remaining, setRemaining] = useState<number>(MAX_PLAYS_PER_DAY);
   const [freePoints, setFreePoints] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const isFreePointPlayRef = useRef(false);
+  const scoreRef = useRef(0);
 
   const endGame = useCallback((currentScore: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -81,21 +83,13 @@ export default function CalculationGame() {
   }, []);
 
   const startGame = useCallback(() => {
+    scoreRef.current = 0;
     setScore(0);
     setTimeLeft(GAME_TIME);
     setInput("");
     setQuestion(generateQuestion());
     setPhase("playing");
   }, []);
-
-  // phase が playing になった直後にフォーカス（iOS WKWebView 対応）
-  useEffect(() => {
-    if (phase !== "playing") return;
-    const raf = requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [phase]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
 
@@ -117,7 +111,7 @@ export default function CalculationGame() {
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
-          setScore((s) => { endGame(s); return s; });
+          endGame(scoreRef.current);
           return 0;
         }
         return t - 1;
@@ -126,18 +120,30 @@ export default function CalculationGame() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase, endGame]);
 
-  const handleInput = useCallback((value: string) => {
-    const cleaned = value.replace(/[^0-9-]/g, "");
-    setInput(cleaned);
-    const val = parseInt(cleaned, 10);
-    if (!isNaN(val) && val === question.answer) {
-      setScore((s) => s + 1);
-      setFlash(true);
-      setTimeout(() => setFlash(false), 200);
-      setQuestion(generateQuestion());
-      setInput("");
-    }
-  }, [question.answer]);
+  const handleNumpad = useCallback((key: string) => {
+    if (phase !== "playing") return;
+
+    setInput((prev) => {
+      let next: string;
+      if (key === "⌫") {
+        next = prev.slice(0, -1);
+      } else {
+        if (prev.length >= 3) return prev;
+        next = prev + key;
+      }
+
+      const val = parseInt(next, 10);
+      if (!isNaN(val) && val === question.answer) {
+        scoreRef.current += 1;
+        setScore(scoreRef.current);
+        setFlash(true);
+        setTimeout(() => setFlash(false), 200);
+        setQuestion(generateQuestion());
+        return "";
+      }
+      return next;
+    });
+  }, [phase, question.answer]);
 
   const timerColor =
     timeLeft > 20 ? "text-green-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
@@ -175,7 +181,8 @@ export default function CalculationGame() {
         <CountdownOverlay count={countdown} />
 
         {phase === "playing" && (
-          <div className="card p-8 flex flex-col items-center gap-6 animate-scale-in">
+          <div className="card p-4 flex flex-col items-center gap-4 animate-scale-in">
+            {/* スコア・タイマー */}
             <div className="flex justify-between w-full">
               <div className="text-center">
                 <p className="text-[#64748b] text-xs">スコア</p>
@@ -187,27 +194,43 @@ export default function CalculationGame() {
               </div>
             </div>
 
-            <div className={`text-5xl font-black text-white py-4 transition-all ${flash ? "text-green-400 scale-110" : ""}`}>
+            {/* 問題 */}
+            <div className={`text-4xl font-black text-white py-2 transition-all ${flash ? "text-green-400 scale-110" : ""}`}>
               {question.a} {question.op} {question.b} = ?
             </div>
 
-            <input
-              ref={inputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="-?[0-9]*"
-              value={input}
-              onChange={(e) => handleInput(e.target.value)}
-              onBlur={() => {
-                if (phase === "playing") {
-                  requestAnimationFrame(() => inputRef.current?.focus());
-                }
-              }}
-              className="w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 border-[#2a2a4a] rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all"
-              placeholder="答えを入力"
-              autoComplete="off"
-              autoFocus
-            />
+            {/* 入力表示 */}
+            <div className="w-full bg-[#0f0f1a] border-2 border-[#2a2a4a] rounded-xl p-3 text-center min-h-[56px] flex items-center justify-center">
+              <span className={`text-3xl font-bold ${input ? "text-white" : "text-[#2a2a4a]"}`}>
+                {input || "―"}
+              </span>
+            </div>
+
+            {/* テンキー */}
+            <div className="grid grid-cols-3 gap-2 w-full">
+              {NUMPAD_KEYS.map((key) => (
+                <button
+                  key={key}
+                  onPointerDown={(e) => { e.preventDefault(); handleNumpad(key); }}
+                  className="h-14 rounded-xl text-xl font-bold text-white bg-[#1a1a2e] border border-[#2a2a4a] active:bg-[#2a2a4a] active:scale-95 transition-all select-none"
+                >
+                  {key}
+                </button>
+              ))}
+              {/* 最終行: 0 (2列) + ⌫ (1列) */}
+              <button
+                onPointerDown={(e) => { e.preventDefault(); handleNumpad("0"); }}
+                className="col-span-2 h-14 rounded-xl text-xl font-bold text-white bg-[#1a1a2e] border border-[#2a2a4a] active:bg-[#2a2a4a] active:scale-95 transition-all select-none"
+              >
+                0
+              </button>
+              <button
+                onPointerDown={(e) => { e.preventDefault(); handleNumpad("⌫"); }}
+                className="h-14 rounded-xl text-xl font-bold text-[#64748b] bg-[#1a1a2e] border border-[#2a2a4a] active:bg-[#2a2a4a] active:scale-95 transition-all select-none"
+              >
+                ⌫
+              </button>
+            </div>
           </div>
         )}
 
