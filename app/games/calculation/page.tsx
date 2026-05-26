@@ -86,8 +86,16 @@ export default function CalculationGame() {
     setInput("");
     setQuestion(generateQuestion());
     setPhase("playing");
-    setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
+
+  // phase が playing になった直後にフォーカス（iOS WKWebView 対応）
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const raf = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
 
@@ -190,10 +198,15 @@ export default function CalculationGame() {
               pattern="-?[0-9]*"
               value={input}
               onChange={(e) => handleInput(e.target.value)}
-              onBlur={() => { if (phase === "playing") setTimeout(() => inputRef.current?.focus(), 10); }}
+              onBlur={() => {
+                if (phase === "playing") {
+                  requestAnimationFrame(() => inputRef.current?.focus());
+                }
+              }}
               className="w-full text-center text-3xl font-bold bg-[#0f0f1a] border-2 border-[#2a2a4a] rounded-xl p-3 text-white outline-none focus:border-[#6c63ff] transition-all"
               placeholder="答えを入力"
               autoComplete="off"
+              autoFocus
             />
           </div>
         )}
