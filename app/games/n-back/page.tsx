@@ -216,8 +216,8 @@ export default function NBackGame() {
               <p>正解 + ミス・見逃しの合計<span className="text-white font-bold">20回</span>で終了</p>
               <p>正解<span className="text-white font-bold">10問</span>で⚡高速モード（1秒）</p>
               <p>正解<span className="text-white font-bold">15問</span>で⚡⚡超高速（0.8秒）</p>
-              <p>全問正解で<span className="text-white font-bold">満点（20点）</span></p>
-              {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}点</span></p>}
+              <p>全問正解で<span className="text-white font-bold">最高（20問）</span></p>
+              {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}問</span></p>}
             </div>
             {remaining > 0 ? (
               <button onClick={startCountdown} className="btn-primary w-full text-lg">
@@ -279,7 +279,7 @@ export default function NBackGame() {
           <ResultModal
             score={score}
             best={best}
-            unit="点"
+            unit="問"
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
@@ -287,7 +287,7 @@ export default function NBackGame() {
               const age = getAge();
               if (!age) return undefined;
               const b = getBenchmark(GAME_ID, age);
-              return { ...b, unit: "点" };
+              return { ...b, unit: "問" };
             })()}
             gameId={GAME_ID}
           />

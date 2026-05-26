@@ -7,7 +7,7 @@ export const GAME_META: Record<GameId, { label: string; unit: string; lowerIsBet
   stroop:        { label: "ストループテスト", unit: "個" },
   reaction:      { label: "反応速度テスト",  unit: "ms", lowerIsBetter: true },
   pattern:       { label: "図形記憶",       unit: "個" },
-  "n-back":           { label: "Nバック課題",     unit: "点" },
+  "n-back":           { label: "Nバック課題",     unit: "問" },
   "dual-task":        { label: "注意分割タスク",   unit: "問" },
   "trail-making":     { label: "トレイルメイキング", unit: "秒", lowerIsBetter: true },
   "mental-rotation":  { label: "心的回転",         unit: "問" },
