@@ -28,8 +28,8 @@ export default function ResultModal({ score, best, unit = "点", isNewBest, onRe
     const equal = score === b.average;
     const diff = parseFloat(Math.abs(score - b.average).toFixed(1));
     if (equal) return { text: "平均と同じ", color: "text-yellow-400" };
-    if (better) return { text: `平均より${!b.lowerIsBetter ? "+" : ""}${diff}${b.unit}上`, color: "text-green-400" };
-    return { text: `平均より${diff}${b.unit}下`, color: "text-orange-400" };
+    if (better) return { text: b.lowerIsBetter ? `平均より${diff}${b.unit}速い` : `平均より+${diff}${b.unit}上`, color: "text-green-400" };
+    return { text: b.lowerIsBetter ? `平均より${diff}${b.unit}遅い` : `平均より${diff}${b.unit}下`, color: "text-orange-400" };
   };
 
   return (

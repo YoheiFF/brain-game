@@ -6,7 +6,7 @@ const REFERENCE: Record<GameId, number> = {
   calculation: 15,
   "memory-number": 7,
   stroop: 18,
-  reaction: 10,
+  reaction: 300,
   pattern: 12,
   "n-back":          10,
   "dual-task":       10,

@@ -91,15 +91,14 @@ export default function ReactionGame() {
     if (round >= ROUNDS) {
       const avg = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
       setAvgTime(avg);
-      const points = reactionToPoints(avg);
       const isFreePointsUsed = isFreePointPlayRef.current;
       isFreePointPlayRef.current = false;
-      const newBest = saveScore("reaction", points, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
-      recordPlay("reaction", points);
+      const newBest = saveScore("reaction", avg, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
+      recordPlay("reaction", avg);
       setRemaining(getRemainingPlays("reaction"));
       setFreePoints(getFreePoints());
       setBest(newBest);
-      setIsNewBest(newBest === points);
+      setIsNewBest(newBest === avg);
       setPhase("result");
     } else {
       setRound((r) => r + 1);
@@ -126,7 +125,7 @@ export default function ReactionGame() {
               <p>画面が<span className="text-green-400 font-bold">緑</span>になったらすぐにタップ！</p>
               <p>赤い間はタップしないでください</p>
               <p>{ROUNDS}回の平均タイムを計測します</p>
-              {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}点</span></p>}
+              {best !== null && <p className="text-[#6c63ff]">ベストスコア: <span className="font-bold">{best}ms</span></p>}
             </div>
             {remaining > 0 ? (
               <button onClick={startGame} className="btn-primary w-full text-lg">
@@ -192,13 +191,13 @@ export default function ReactionGame() {
 
         {phase === "result" && (
           <ResultModal
-            score={reactionToPoints(avgTime)}
+            score={avgTime}
             best={best}
-            unit="点"
+            unit="ms"
             isNewBest={isNewBest}
             onRetry={startGame}
             onHome={() => router.push("/")}
-            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("reaction", age); return { ...b, unit: "点" }; })()}
+            benchmark={(() => { const age = getAge(); if (!age) return undefined; const b = getBenchmark("reaction", age); return { ...b, unit: "ms", lowerIsBetter: true }; })()}
             gameId="reaction"
           />
         )}
