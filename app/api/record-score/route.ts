@@ -111,23 +111,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // 1日上限チェック（DB 参照）
+    // 1日上限チェック（フリープレイは上限なし）
+    const isFreePointsUsed = freePointsUsed === true;
     const db = await getDb();
     const today = new Date().toISOString().slice(0, 10);
-    const playResult = await db.execute({
-      sql: "SELECT play_count FROM daily_plays WHERE user_id = ? AND game_id = ? AND play_date = ?",
-      args: [userId, validGameId, today],
-    });
-    const currentPlayCount = playResult.rows[0]
-      ? (playResult.rows[0].play_count as number)
-      : 0;
-    const isFreePointsUsed = freePointsUsed === true;
-    const effectiveLimit = MAX_PLAYS_PER_DAY + (isFreePointsUsed ? 1 : 0);
-    if (currentPlayCount >= effectiveLimit) {
-      return NextResponse.json(
-        { success: false, error: "daily play limit exceeded" },
-        { status: 429, headers: corsHeaders }
-      );
+    if (!isFreePointsUsed) {
+      const playResult = await db.execute({
+        sql: "SELECT play_count FROM daily_plays WHERE user_id = ? AND game_id = ? AND play_date = ?",
+        args: [userId, validGameId, today],
+      });
+      const currentPlayCount = playResult.rows[0]
+        ? (playResult.rows[0].play_count as number)
+        : 0;
+      if (currentPlayCount >= MAX_PLAYS_PER_DAY) {
+        return NextResponse.json(
+          { success: false, error: "daily play limit exceeded" },
+          { status: 429, headers: corsHeaders }
+        );
+      }
     }
 
     // DB 書き込み
