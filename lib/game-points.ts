@@ -12,7 +12,7 @@ const REFERENCE: Record<GameId, number> = {
   "dual-task":       10,
   "trail-making":    20,
   "mental-rotation": 10,
-  "running-total":   6,
+  "running-total":   5,
 }
 
 /** ゲームの生スコアを 1〜20 点に換算する */
