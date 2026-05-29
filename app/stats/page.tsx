@@ -70,9 +70,15 @@ export default function StatsPage() {
             <h2 className="text-lg font-bold text-white mb-4">🧬 脳年齢診断</h2>
             {brainAge !== null ? (
               <div className="flex items-end gap-3">
-                <span className="text-6xl font-black text-[#6c63ff]">{brainAge}</span>
-                <span className="text-[#64748b] text-lg mb-1">歳</span>
-                {age !== null && (
+                {brainAge >= 60 ? (
+                  <span className="text-5xl font-black text-[#6c63ff]">60歳以上</span>
+                ) : (
+                  <>
+                    <span className="text-6xl font-black text-[#6c63ff]">{brainAge}</span>
+                    <span className="text-[#64748b] text-lg mb-1">歳</span>
+                  </>
+                )}
+                {age !== null && brainAge < 60 && (
                   <span className={`text-sm mb-1 font-bold ${
                     brainAge < age ? "text-green-400" :
                     brainAge > age + 5 ? "text-red-400" : "text-yellow-400"
