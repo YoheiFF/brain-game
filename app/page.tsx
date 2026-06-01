@@ -309,6 +309,30 @@ export default function Home() {
             </div>
           </Link>
         ))}
+
+        {/* SuperBrainボタン（2列フル幅） */}
+        <Link
+          href="/superbrain"
+          className="col-span-1 sm:col-span-2 card p-5 hover:scale-[1.01] transition-all duration-200 group animate-fade-in border-orange-500/30 hover:border-orange-500/60"
+          style={{ animationDelay: `${GAMES.length * 60}ms` }}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-600 via-orange-500 to-yellow-500 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+              🧠⚡
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-lg font-black text-white">SuperBrain チャレンジ</h2>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400">
+                  NEW
+                </span>
+              </div>
+              <p className="text-[#64748b] text-sm">全ゲームから5連続ランダムチャレンジ！</p>
+              <p className="text-orange-400/80 text-xs mt-1">1問でもミスでゲームオーバー</p>
+            </div>
+            <span className="text-orange-400 text-xl flex-shrink-0">→</span>
+          </div>
+        </Link>
       </div>
 
       <p className="text-center text-[#2a2a4a] text-xs mt-10">

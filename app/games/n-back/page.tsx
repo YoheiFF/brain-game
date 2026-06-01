@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -11,15 +11,17 @@ import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
 import CountdownOverlay from "@/components/CountdownOverlay";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "result";
 
 const GAME_ID = "n-back" as const;
-const N_LEVEL = 2;
 const TOTAL_ROUNDS = 20;
 
-// 正解数に応じた速度ステージ
-const SPEED_STAGES = [
+// 正解数に応じた速度ステージ（通常モード基準）
+const SPEED_STAGES_BASE = [
   { threshold: 0,  ms: 1100, label: "通常" },
   { threshold: 10, ms: 900,  label: "⚡ 高速モード！" },
   { threshold: 15, ms: 700,  label: "⚡⚡ 超高速！" },
@@ -27,14 +29,36 @@ const SPEED_STAGES = [
 
 function getStageIndex(correct: number): number {
   let stage = 0;
-  for (let i = 0; i < SPEED_STAGES.length; i++) {
-    if (correct >= SPEED_STAGES[i].threshold) stage = i;
+  for (let i = 0; i < SPEED_STAGES_BASE.length; i++) {
+    if (correct >= SPEED_STAGES_BASE[i].threshold) stage = i;
   }
   return stage;
 }
 
-export default function NBackGame() {
+function NBackGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS["n-back"][sbDifficulty]
+    : DIFFICULTY_PARAMS["n-back"].normal;
+  const N_LEVEL = diffParams.nLevel;
+  const speedMultiplier = diffParams.speedMultiplier;
+
+  // speedMultiplier を適用した速度ステージ
+  const SPEED_STAGES = SPEED_STAGES_BASE.map((s) => ({
+    ...s,
+    ms: Math.round(s.ms / speedMultiplier),
+  }));
+
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
@@ -80,17 +104,41 @@ export default function NBackGame() {
     };
   }, [resume]);
 
+  const handleSuperBrainComplete = useCallback((finalScore: number) => {
+    const passed = isPassed(GAME_ID, sbDifficulty, finalScore);
+    const threshold = PASS_THRESHOLD[GAME_ID]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: GAME_ID,
+          difficulty: sbDifficulty,
+          score: finalScore,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   // 次の刺激を生成（50%でマッチ、即時繰り返しなし）
-  function nextStimulus(history: number[]): { num: number; isMatch: boolean } {
+  function nextStimulus(history: number[], nLevel: number): { num: number; isMatch: boolean } {
     const prev = history[history.length - 1];
 
-    if (history.length < N_LEVEL) {
+    if (history.length < nLevel) {
       let n: number;
       do { n = Math.floor(Math.random() * 9) + 1; } while (n === prev);
       return { num: n, isMatch: false };
     }
 
-    const nBack = history[history.length - N_LEVEL];
+    const nBack = history[history.length - nLevel];
 
     // 50%でマッチ（即時繰り返しにならない場合のみ）
     if (Math.random() < 0.5 && nBack !== prev) {
@@ -108,6 +156,12 @@ export default function NBackGame() {
     gameEndedRef.current = true;
     if (intervalRef.current) clearInterval(intervalRef.current);
     const finalScore = correctRef.current;
+
+    if (isSuperBrain) {
+      handleSuperBrainComplete(finalScore);
+      return;
+    }
+
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const isFreePointsUsed = isFreePointPlayRef.current;
@@ -120,7 +174,7 @@ export default function NBackGame() {
     setIsNewBest(newBest === finalScore && finalScore > 0);
     setScore(finalScore);
     setPhase("result");
-  }, []);
+  }, [isSuperBrain, handleSuperBrainComplete]);
 
   const tick = useCallback(() => {
     if (gameEndedRef.current) return;
@@ -134,14 +188,14 @@ export default function NBackGame() {
       }
     }
 
-    const { num, isMatch } = nextStimulus(historyRef.current);
+    const { num, isMatch } = nextStimulus(historyRef.current, N_LEVEL);
     historyRef.current.push(num);
     currentIsMatchRef.current = isMatch;
     respondedRef.current = false;
     setCurrentNumber(num);
     setResponded(false);
     setFeedbackType(null);
-  }, [endGame]);
+  }, [endGame, N_LEVEL]);
 
   const launchInterval = useCallback((ms: number) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -168,9 +222,17 @@ export default function NBackGame() {
     setPhase("playing");
 
     launchInterval(SPEED_STAGES[0].ms);
-  }, [endGame, launchInterval]);
+  }, [endGame, launchInterval, SPEED_STAGES]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
+  // SuperBrainモード時は自動でカウントダウン開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startCountdown();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const handleSameButton = useCallback(() => {
     if (phaseRef.current !== "playing") return;
@@ -200,19 +262,26 @@ export default function NBackGame() {
 
     setTimeout(() => setFeedbackType(null), 400);
     if (correctRef.current + missRef.current >= TOTAL_ROUNDS) endGame();
-  }, [endGame, launchInterval]);
+  }, [endGame, launchInterval, N_LEVEL, SPEED_STAGES]);
 
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
-        <GameHeader title="2バック課題" description="2個前と同じ数字が出たら「同じ」を押そう" />
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="n-back"
+          />
+        )}
+        <GameHeader title={`${N_LEVEL}バック課題`} description={`${N_LEVEL}個前と同じ数字が出たら「同じ」を押そう`} />
 
-        {phase === "ready" && countdown === null && (
+        {phase === "ready" && countdown === null && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🔄</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
               <p>数字が順番に表示されます</p>
-              <p><span className="text-white font-bold">2個前</span>と同じ数字が出たら「同じ」を押してください</p>
+              <p><span className="text-white font-bold">{N_LEVEL}個前</span>と同じ数字が出たら「同じ」を押してください</p>
               <p>正解 + ミス・見逃しの合計<span className="text-white font-bold">20回</span>で終了</p>
               <p>正解<span className="text-white font-bold">10問</span>で⚡高速モード（1秒）</p>
               <p>正解<span className="text-white font-bold">15問</span>で⚡⚡超高速（0.8秒）</p>
@@ -241,7 +310,7 @@ export default function NBackGame() {
         {phase === "playing" && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-scale-in">
             <div className="flex justify-between w-full text-sm text-[#64748b]">
-              <span>N = 2</span>
+              <span>N = {N_LEVEL}</span>
               <span>正解: <span className="text-white font-bold">{correctCount}</span></span>
               <span>ミス: <span className="text-red-400 font-bold">{missCount}</span></span>
               <span>残り: <span className="text-white font-bold">{TOTAL_ROUNDS - correctCount - missCount}</span></span>
@@ -275,7 +344,7 @@ export default function NBackGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={score}
             best={best}
@@ -294,5 +363,19 @@ export default function NBackGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function NBackGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <NBackGameInner />
+    </Suspense>
   );
 }

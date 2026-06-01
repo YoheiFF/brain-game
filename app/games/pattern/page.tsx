@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -9,6 +9,9 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -23,11 +26,28 @@ function generatePattern(count: number): Set<number> {
   return cells;
 }
 
-export default function PatternGame() {
+function PatternGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS.pattern[sbDifficulty]
+    : DIFFICULTY_PARAMS.pattern.normal;
+  const startLevelParam = diffParams.startLevel;
+  const showTimeBase = diffParams.showTimeBase;
+  const showTimePerLevel = diffParams.showTimePerLevel;
+
   const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
-  const [level, setLevel] = useState(3);
+  const [level, setLevel] = useState(startLevelParam);
   const [pattern, setPattern] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [best, setBest] = useState<number | null>(null);
@@ -51,20 +71,52 @@ export default function PatternGame() {
 
   useEffect(() => { return () => { resume(); }; }, [resume]);
 
+  const handleSuperBrainComplete = useCallback((score: number) => {
+    const passed = isPassed("pattern", sbDifficulty, score);
+    const threshold = PASS_THRESHOLD["pattern"]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: "pattern",
+          difficulty: sbDifficulty,
+          score,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const startRound = useCallback((lvl: number) => {
     const p = generatePattern(Math.min(lvl + 2, TOTAL - 1));
     setPattern(p);
     setSelected(new Set());
     setWrongCells(new Set());
     setPhase("showing");
-    setTimeout(() => setPhase("input"), 1200 + lvl * 100);
-  }, []);
+    setTimeout(() => setPhase("input"), showTimeBase + lvl * showTimePerLevel);
+  }, [showTimeBase, showTimePerLevel]);
 
   const startGame = useCallback(() => {
     setScore(0);
-    setLevel(1);
-    startRound(1);
-  }, [startRound]);
+    setLevel(startLevelParam);
+    startRound(startLevelParam);
+  }, [startRound, startLevelParam]);
+
+  // SuperBrainモード時は自動でゲーム開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startGame();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const toggleCell = useCallback((i: number) => {
     if (phase !== "input") return;
@@ -82,6 +134,8 @@ export default function PatternGame() {
       selected.size === pattern.size &&
       [...selected].every((c) => pattern.has(c));
 
+    const patternCount = Math.min(level + 2, 25);
+
     if (isCorrect) {
       const newScore = patternCount;
       setScore(newScore);
@@ -96,27 +150,39 @@ export default function PatternGame() {
       setWrongCells(wrong);
       setPhase("wrong");
       setTimeout(() => {
+        const currentScore = score;
+        if (isSuperBrain) {
+          handleSuperBrainComplete(currentScore);
+          return;
+        }
         const isFreePointsUsed = isFreePointPlayRef.current;
         isFreePointPlayRef.current = false;
-        const newBest = saveScore("pattern", score, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
-        recordPlay("pattern", score);
+        const newBest = saveScore("pattern", currentScore, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
+        recordPlay("pattern", currentScore);
         setRemaining(getRemainingPlays("pattern"));
         setFreePoints(getFreePoints());
         setBest(newBest);
-        setIsNewBest(newBest === score && score > 0);
+        setIsNewBest(newBest === currentScore && currentScore > 0);
         setPhase("result");
       }, 1500);
     }
-  }, [phase, selected, pattern, score, level, startRound]);
+  }, [phase, selected, pattern, score, level, startRound, isSuperBrain, handleSuperBrainComplete]);
 
   const patternCount = Math.min(level + 2, 25);
 
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="pattern"
+          />
+        )}
         <GameHeader title="図形記憶" description="光ったマスの位置を覚えて同じように選択しよう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🧩</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -217,7 +283,7 @@ export default function PatternGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={score}
             best={best}
@@ -231,5 +297,19 @@ export default function PatternGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PatternGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <PatternGameInner />
+    </Suspense>
   );
 }

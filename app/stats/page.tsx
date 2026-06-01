@@ -6,6 +6,7 @@ import { getAge } from "@/lib/nickname"
 import { calcBrainAge } from "@/lib/brain-age"
 import { getRadarData, getBrainType, SKILL_GAMES, type CognitiveSkill } from "@/lib/brain-type"
 import { getAllTitles } from "@/lib/titles"
+import { getSuperBrainClearCount } from "@/lib/superbrain-session"
 import RadarChart from "@/components/RadarChart"
 import { useDbSync } from "@/hooks/useDbSync"
 
@@ -45,7 +46,7 @@ export default function StatsPage() {
   const brainAge = calcBrainAge(bests)
   const radarData = getRadarData(bests)
   const brainType = getBrainType(radarData)
-  const titles = getAllTitles(bests, totalPlays)
+  const titles = getAllTitles(bests, totalPlays, getSuperBrainClearCount())
   const hasData = Object.keys(bests).length > 0
 
   return (

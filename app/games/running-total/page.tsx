@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -11,6 +11,9 @@ import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
 import CountdownOverlay from "@/components/CountdownOverlay";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "result";
 type SubPhase = "showing-number" | "showing-ops" | "answering";
@@ -73,8 +76,23 @@ function generateRound(opsCount: number): Round {
   return { initial, ops, answer: running, choices: generateChoices(running) };
 }
 
-export default function RunningTotalGame() {
+function RunningTotalGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS["running-total"][sbDifficulty]
+    : DIFFICULTY_PARAMS["running-total"].normal;
+  const startStageIndex = diffParams.startStageIndex;
+
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
@@ -83,8 +101,8 @@ export default function RunningTotalGame() {
   const [currentRound, setCurrentRound] = useState(0);
   const [currentOpIndex, setCurrentOpIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [currentStage, setCurrentStage] = useState<Stage>(STAGES[0]);
-  const [answerTimeLeft, setAnswerTimeLeft] = useState(STAGES[0].answerSec);
+  const [currentStage, setCurrentStage] = useState<Stage>(STAGES[startStageIndex]);
+  const [answerTimeLeft, setAnswerTimeLeft] = useState(STAGES[startStageIndex].answerSec);
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
 
@@ -99,7 +117,7 @@ export default function RunningTotalGame() {
   const roundsRef = useRef<(Round | undefined)[]>([]);
   const currentRoundRef = useRef(0);
   const scoreRef = useRef(0);
-  const currentStageRef = useRef<Stage>(STAGES[0]);
+  const currentStageRef = useRef<Stage>(STAGES[startStageIndex]);
   const isFreePointPlayRef = useRef(false);
 
   useEffect(() => {
@@ -138,6 +156,30 @@ export default function RunningTotalGame() {
     return () => clearInterval(interval);
   }, [subPhase]);
 
+  const handleSuperBrainComplete = useCallback((finalScoreValue: number) => {
+    const passed = isPassed("running-total", sbDifficulty, finalScoreValue);
+    const threshold = PASS_THRESHOLD["running-total"]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: "running-total",
+          difficulty: sbDifficulty,
+          score: finalScoreValue,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const startOps = useCallback((roundIndex: number, opIndex: number) => {
     const opsCount = roundsRef.current[roundIndex]?.ops.length ?? currentStageRef.current.opsCount;
     if (opIndex >= opsCount) {
@@ -152,7 +194,6 @@ export default function RunningTotalGame() {
   }, []);
 
   const startRound = useCallback((roundIndex: number) => {
-    // ラウンド開始時に現在ステージのopsCountで問題を生成
     const stage = currentStageRef.current;
     const newRound = generateRound(stage.opsCount);
     roundsRef.current[roundIndex] = newRound;
@@ -169,6 +210,12 @@ export default function RunningTotalGame() {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (answerIntervalRef.current) clearInterval(answerIntervalRef.current);
     setFinalScore(finalScoreValue);
+
+    if (isSuperBrain) {
+      handleSuperBrainComplete(finalScoreValue);
+      return;
+    }
+
     const isFreePointsUsed = isFreePointPlayRef.current;
     isFreePointPlayRef.current = false;
     const newBest = saveScore("running-total", finalScoreValue, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
@@ -178,7 +225,7 @@ export default function RunningTotalGame() {
     setBest(newBest);
     setIsNewBest(newBest === finalScoreValue && finalScoreValue > 0);
     setPhase("result");
-  }, []);
+  }, [isSuperBrain, handleSuperBrainComplete]);
 
   const handleAnswer = useCallback((chosen: number | null) => {
     if (answerIntervalRef.current) clearInterval(answerIntervalRef.current);
@@ -226,19 +273,28 @@ export default function RunningTotalGame() {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (answerIntervalRef.current) clearInterval(answerIntervalRef.current);
     scoreRef.current = 0;
-    currentStageRef.current = STAGES[0];
+    const initialStage = STAGES[startStageIndex];
+    currentStageRef.current = initialStage;
     roundsRef.current = [];
     setRounds([]);
     setScore(0);
     setCurrentRound(0);
-    setCurrentStage(STAGES[0]);
+    setCurrentStage(initialStage);
     setFeedback(null);
     setSelectedChoice(null);
     setPhase("playing");
     setTimeout(() => startRound(0), 50);
-  }, [startRound]);
+  }, [startRound, startStageIndex]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
+  // SuperBrainモード時は自動でカウントダウン開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startCountdown();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const currentRoundData = rounds[currentRound];
   const currentOp = currentRoundData?.ops[currentOpIndex];
@@ -265,9 +321,16 @@ export default function RunningTotalGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="running-total"
+          />
+        )}
         <GameHeader title="暗算ランニング" description="流れる数字を頭で計算し続けよう" />
 
-        {phase === "ready" && countdown === null && (
+        {phase === "ready" && countdown === null && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">📈</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -359,7 +422,7 @@ export default function RunningTotalGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={finalScore}
             best={best}
@@ -378,5 +441,19 @@ export default function RunningTotalGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function RunningTotalGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <RunningTotalGameInner />
+    </Suspense>
   );
 }

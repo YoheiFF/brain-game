@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -11,21 +11,38 @@ import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
 import CountdownOverlay from "@/components/CountdownOverlay";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "result";
 type LeftShape = "○" | "△" | "□" | "★";
 
 const GAME_ID = "dual-task" as const;
 const TOTAL_ROUNDS = 20;
-const LEFT_INTERVAL_MS = 1100;
-const RIGHT_INTERVAL_MS = 1000;
-const FAST_LEFT_INTERVAL_MS = 700;
-const FAST_RIGHT_INTERVAL_MS = 800;
-const BOOST_THRESHOLD = 15;
 const LEFT_SHAPES: LeftShape[] = ["○", "△", "□", "★"];
 
-export default function DualTaskGame() {
+function DualTaskGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS["dual-task"][sbDifficulty]
+    : DIFFICULTY_PARAMS["dual-task"].normal;
+  const LEFT_INTERVAL_MS = diffParams.leftIntervalMs;
+  const RIGHT_INTERVAL_MS = diffParams.rightIntervalMs;
+  const FAST_LEFT_INTERVAL_MS = diffParams.fastLeftIntervalMs;
+  const FAST_RIGHT_INTERVAL_MS = diffParams.fastRightIntervalMs;
+  const BOOST_THRESHOLD = diffParams.boostThreshold;
+
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
@@ -80,6 +97,30 @@ export default function DualTaskGame() {
     return () => { resume(); clearAllTimers(); };
   }, [resume, clearAllTimers]);
 
+  const handleSuperBrainComplete = useCallback((finalScore: number) => {
+    const passed = isPassed(GAME_ID, sbDifficulty, finalScore);
+    const threshold = PASS_THRESHOLD[GAME_ID]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: GAME_ID,
+          difficulty: sbDifficulty,
+          score: finalScore,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const endGame = useCallback(() => {
     if (gameEndedRef.current) return;
     gameEndedRef.current = true;
@@ -87,6 +128,12 @@ export default function DualTaskGame() {
     setLeftShape(null);
     setRightNumber(null);
     const finalScore = leftCorrectRef.current + rightCorrectRef.current;
+
+    if (isSuperBrain) {
+      handleSuperBrainComplete(finalScore);
+      return;
+    }
+
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const isFreePointsUsed = isFreePointPlayRef.current;
@@ -99,7 +146,7 @@ export default function DualTaskGame() {
     setIsNewBest(newBest === finalScore && finalScore > 0);
     setScore(finalScore);
     setPhase("result");
-  }, [clearAllTimers]);
+  }, [clearAllTimers, isSuperBrain, handleSuperBrainComplete]);
 
   // 左右を別インターバルで独立して切り替える
   const startTimers = useCallback((leftMs: number, rightMs: number) => {
@@ -150,7 +197,7 @@ export default function DualTaskGame() {
     speedBoostedRef.current = true;
     setSpeedBoosted(true);
     startTimers(FAST_LEFT_INTERVAL_MS, FAST_RIGHT_INTERVAL_MS);
-  }, [startTimers]);
+  }, [startTimers, FAST_LEFT_INTERVAL_MS, FAST_RIGHT_INTERVAL_MS]);
 
   const startGame = useCallback(() => {
     clearAllTimers();
@@ -180,9 +227,17 @@ export default function DualTaskGame() {
     setPhase("playing");
 
     startTimers(LEFT_INTERVAL_MS, RIGHT_INTERVAL_MS);
-  }, [clearAllTimers, startTimers]);
+  }, [clearAllTimers, startTimers, LEFT_INTERVAL_MS, RIGHT_INTERVAL_MS]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
+  // SuperBrainモード時は自動でカウントダウン開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startCountdown();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const handleLeftTap = useCallback(() => {
     if (phaseRef.current !== "playing") return;
@@ -205,7 +260,7 @@ export default function DualTaskGame() {
     const totalCorrect = leftCorrectRef.current + rightCorrectRef.current;
     if (totalCorrect >= BOOST_THRESHOLD && totalMissRef.current === 0) boostSpeed();
     if (totalCorrect + totalMissRef.current >= TOTAL_ROUNDS) endGame();
-  }, [endGame, boostSpeed]);
+  }, [endGame, boostSpeed, BOOST_THRESHOLD]);
 
   const handleRightTap = useCallback(() => {
     if (phaseRef.current !== "playing") return;
@@ -228,14 +283,21 @@ export default function DualTaskGame() {
     const totalCorrect = leftCorrectRef.current + rightCorrectRef.current;
     if (totalCorrect >= BOOST_THRESHOLD && totalMissRef.current === 0) boostSpeed();
     if (totalCorrect + totalMissRef.current >= TOTAL_ROUNDS) endGame();
-  }, [endGame, boostSpeed]);
+  }, [endGame, boostSpeed, BOOST_THRESHOLD]);
 
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="dual-task"
+          />
+        )}
         <GameHeader title="注意分割タスク" description="左は○を、右は偶数をタップしよう" />
 
-        {phase === "ready" && countdown === null && (
+        {phase === "ready" && countdown === null && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">👁</div>
             <div className="text-center text-[#64748b] text-sm space-y-2">
@@ -305,7 +367,7 @@ export default function DualTaskGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={score}
             best={best}
@@ -324,5 +386,19 @@ export default function DualTaskGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DualTaskGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <DualTaskGameInner />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -11,6 +11,9 @@ import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
 import CountdownOverlay from "@/components/CountdownOverlay";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -47,15 +50,28 @@ function generateQuestion(): StroopQuestion {
   return { word, inkColor, correctAnswer, choices };
 }
 
-const GAME_TIME = 30;
-
-export default function StroopGame() {
+function StroopGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS.stroop[sbDifficulty]
+    : DIFFICULTY_PARAMS.stroop.normal;
+  const gameTime = diffParams.gameTime;
+
   const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [question, setQuestion] = useState<StroopQuestion>(generateQuestion());
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_TIME);
+  const [timeLeft, setTimeLeft] = useState(gameTime);
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
   const [finalScore, setFinalScore] = useState(0);
   const [best, setBest] = useState<number | null>(null);
@@ -79,9 +95,39 @@ export default function StroopGame() {
 
   useEffect(() => { return () => { resume(); }; }, [resume]);
 
+  const handleSuperBrainComplete = useCallback((score: number) => {
+    const passed = isPassed("stroop", sbDifficulty, score);
+    const threshold = PASS_THRESHOLD["stroop"]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: "stroop",
+          difficulty: sbDifficulty,
+          score,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const endGame = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     const s = scoreRef.current;
+
+    if (isSuperBrain) {
+      handleSuperBrainComplete(s);
+      return;
+    }
+
     setFinalScore(s);
     const isFreePointsUsed = isFreePointPlayRef.current;
     isFreePointPlayRef.current = false;
@@ -92,18 +138,26 @@ export default function StroopGame() {
     setBest(newBest);
     setIsNewBest(newBest === s && s > 0);
     setPhase("result");
-  }, []);
+  }, [isSuperBrain, handleSuperBrainComplete]);
 
   const startGame = useCallback(() => {
     scoreRef.current = 0;
     setScore(0);
-    setTimeLeft(GAME_TIME);
+    setTimeLeft(gameTime);
     setFeedback(null);
     setQuestion(generateQuestion());
     setPhase("playing");
-  }, []);
+  }, [gameTime]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
+  // SuperBrainモード時は自動でカウントダウン開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startCountdown();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   useEffect(() => {
     if (phase !== "playing") return;
@@ -135,9 +189,16 @@ export default function StroopGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="stroop"
+          />
+        )}
         <GameHeader title="ストループテスト" description="文字の色（インクの色）を選んでください" />
 
-        {phase === "ready" && countdown === null && (
+        {phase === "ready" && countdown === null && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🎨</div>
             <div className="text-center space-y-3">
@@ -219,7 +280,7 @@ export default function StroopGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={finalScore}
             best={best}
@@ -233,5 +294,19 @@ export default function StroopGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function StroopGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <StroopGameInner />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -9,20 +9,31 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "waiting" | "go" | "tooEarly" | "result";
 
-const ROUNDS = 5;
-const MIN_WAIT = 1500;
-const MAX_WAIT = 4000;
-
-function reactionToPoints(ms: number): number {
-  if (ms <= 200) return 20;
-  return Math.max(0, 20 - Math.floor((ms - 200) / 10));
-}
-
-export default function ReactionGame() {
+function ReactionGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS.reaction[sbDifficulty]
+    : DIFFICULTY_PARAMS.reaction.normal;
+  const ROUNDS = diffParams.rounds;
+  const MIN_WAIT = diffParams.minWait;
+  const MAX_WAIT = diffParams.maxWait;
+
   const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
   const [round, setRound] = useState(0);
@@ -61,19 +72,51 @@ export default function ReactionGame() {
     };
   }, [phase]);
 
+  const handleSuperBrainComplete = useCallback((score: number) => {
+    const passed = isPassed("reaction", sbDifficulty, score);
+    const threshold = PASS_THRESHOLD["reaction"]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: "reaction",
+          difficulty: sbDifficulty,
+          score,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const startRound = useCallback(() => {
     setPhase("waiting");
     const delay = MIN_WAIT + Math.random() * (MAX_WAIT - MIN_WAIT);
     timeoutRef.current = setTimeout(() => {
-      setPhase("go"); // startTime はフレーム描画後に設定
+      setPhase("go");
     }, delay);
-  }, []);
+  }, [MIN_WAIT, MAX_WAIT]);
 
   const startGame = useCallback(() => {
     setRound(1);
     setTimes([]);
     startRound();
   }, [startRound]);
+
+  // SuperBrainモード時は自動でゲーム開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startGame();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const handleTap = useCallback(() => {
     if (phase === "waiting") {
@@ -91,6 +134,12 @@ export default function ReactionGame() {
     if (round >= ROUNDS) {
       const avg = Math.round(newTimes.reduce((a, b) => a + b, 0) / newTimes.length);
       setAvgTime(avg);
+
+      if (isSuperBrain) {
+        handleSuperBrainComplete(avg);
+        return;
+      }
+
       const isFreePointsUsed = isFreePointPlayRef.current;
       isFreePointPlayRef.current = false;
       const newBest = saveScore("reaction", avg, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
@@ -105,7 +154,7 @@ export default function ReactionGame() {
       setTimeout(() => startRound(), 800);
       setPhase("waiting");
     }
-  }, [phase, times, round, startRound]);
+  }, [phase, times, round, startRound, ROUNDS, isSuperBrain, handleSuperBrainComplete]);
 
   const bgColor =
     phase === "waiting" ? "bg-red-900/30 border-red-800" :
@@ -116,9 +165,16 @@ export default function ReactionGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="reaction"
+          />
+        )}
         <GameHeader title="反応速度テスト" description={`全${ROUNDS}回の平均反応時間を測定します`} />
 
-        {phase === "ready" && (
+        {phase === "ready" && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">⚡</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -189,7 +245,7 @@ export default function ReactionGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={avgTime}
             best={best}
@@ -203,5 +259,19 @@ export default function ReactionGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ReactionGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <ReactionGameInner />
+    </Suspense>
   );
 }

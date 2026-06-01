@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -9,6 +9,9 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "feedback" | "result";
 type Verdict = "same" | "mirror";
@@ -17,8 +20,6 @@ const GAME_ID = "mental-rotation" as const;
 const TOTAL_QUESTIONS = 20;
 const FEEDBACK_DURATION_MS = 500;
 const HALF_QUESTIONS = 10;
-const TIME_FIRST_HALF_MS = 3000;
-const TIME_SECOND_HALF_MS = 2000;
 const ROTATIONS = [0, 45, 90, 135, 180, 225, 270, 315];
 
 const SHAPES: { id: number; points: string }[] = [
@@ -40,8 +41,24 @@ const SHAPES: { id: number; points: string }[] = [
   { id: 8, points: "40,10 85,10 85,40 60,40 60,90 15,90 15,60 40,60 40,10" },
 ];
 
-export default function MentalRotationGame() {
+function MentalRotationGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS["mental-rotation"][sbDifficulty]
+    : DIFFICULTY_PARAMS["mental-rotation"].normal;
+  const TIME_FIRST_HALF_MS = diffParams.timeFirstHalfMs;
+  const TIME_SECOND_HALF_MS = diffParams.timeSecondHalfMs;
+
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
@@ -85,6 +102,30 @@ export default function MentalRotationGame() {
     };
   }, [resume]);
 
+  const handleSuperBrainComplete = useCallback((finalScore: number) => {
+    const passed = isPassed(GAME_ID, sbDifficulty, finalScore);
+    const threshold = PASS_THRESHOLD[GAME_ID]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: GAME_ID,
+          difficulty: sbDifficulty,
+          score: finalScore,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   function pickNextShape(): typeof SHAPES[0] {
     if (deckRef.current.length === 0) {
       deckRef.current = [...SHAPES].sort(() => Math.random() - 0.5);
@@ -105,6 +146,12 @@ export default function MentalRotationGame() {
   const endGame = useCallback(() => {
     if (questionTimerRef.current) clearInterval(questionTimerRef.current);
     const finalScore = correctCountRef.current;
+
+    if (isSuperBrain) {
+      handleSuperBrainComplete(finalScore);
+      return;
+    }
+
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const isFreePointsUsed = isFreePointPlayRef.current;
@@ -117,7 +164,7 @@ export default function MentalRotationGame() {
     setIsNewBest(newBest === finalScore && finalScore > 0);
     setScore(finalScore);
     setPhase("result");
-  }, []);
+  }, [isSuperBrain, handleSuperBrainComplete]);
 
   const nextQuestion = useCallback(() => {
     applyNextQuestion();
@@ -155,7 +202,7 @@ export default function MentalRotationGame() {
         }, FEEDBACK_DURATION_MS);
       }
     }, 50);
-  }, [endGame]);
+  }, [endGame, TIME_FIRST_HALF_MS, TIME_SECOND_HALF_MS]);
 
   useEffect(() => {
     if (phase === "playing") startQuestionTimer();
@@ -174,6 +221,14 @@ export default function MentalRotationGame() {
     applyNextQuestion();
     setPhase("playing");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // SuperBrainモード時は自動でゲーム開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startGame();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const handleAnswer = useCallback((verdict: Verdict) => {
     if (answeredRef.current) return;
@@ -207,9 +262,16 @@ export default function MentalRotationGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="mental-rotation"
+          />
+        )}
         <GameHeader title="心的回転" description="図形が同じか鏡像かを判断しよう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🔃</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -314,7 +376,7 @@ export default function MentalRotationGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={score}
             best={best}
@@ -333,5 +395,19 @@ export default function MentalRotationGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MentalRotationGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <MentalRotationGameInner />
+    </Suspense>
   );
 }

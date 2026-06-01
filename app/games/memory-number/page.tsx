@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -9,6 +9,9 @@ import { getBenchmark } from "@/lib/benchmarks";
 import { recordPlay, getRemainingPlays, MAX_PLAYS_PER_DAY, getFreePoints, consumeFreePoint } from "@/lib/daily";
 import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -16,14 +19,29 @@ function generateSequence(length: number): number[] {
   return Array.from({ length }, () => Math.floor(Math.random() * 10));
 }
 
-const SHOW_MS_PER_DIGIT = 600;
 const MAX_LEVEL = 20;
 
-export default function MemoryNumberGame() {
+function MemoryNumberGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS["memory-number"][sbDifficulty]
+    : DIFFICULTY_PARAMS["memory-number"].normal;
+  const showMsPerDigit = diffParams.showMsPerDigit;
+  const startLevelParam = diffParams.startLevel;
+
   const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
-  const [level, setLevel] = useState(3);
+  const [level, setLevel] = useState(startLevelParam);
   const [sequence, setSequence] = useState<number[]>([]);
   const [input, setInput] = useState("");
   const [best, setBest] = useState<number | null>(null);
@@ -49,6 +67,30 @@ export default function MemoryNumberGame() {
 
   useEffect(() => { return () => { resume(); }; }, [resume]);
 
+  const handleSuperBrainComplete = useCallback((score: number) => {
+    const passed = isPassed("memory-number", sbDifficulty, score);
+    const threshold = PASS_THRESHOLD["memory-number"]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: "memory-number",
+          difficulty: sbDifficulty,
+          score,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const startRound = useCallback((len: number) => {
     gameEndedRef.current = false;
     const seq = generateSequence(len);
@@ -62,17 +104,17 @@ export default function MemoryNumberGame() {
       i++;
       if (i < seq.length) {
         setShowIndex(i);
-        setTimeout(tick, SHOW_MS_PER_DIGIT);
+        setTimeout(tick, showMsPerDigit);
       } else {
         setTimeout(() => {
           setShowIndex(-1);
           setPhase("input");
           setInputTimeLeft(seq.length + 3);
-        }, SHOW_MS_PER_DIGIT);
+        }, showMsPerDigit);
       }
     };
-    setTimeout(tick, SHOW_MS_PER_DIGIT);
-  }, []);
+    setTimeout(tick, showMsPerDigit);
+  }, [showMsPerDigit]);
 
   useEffect(() => {
     if (phase !== "input") {
@@ -87,6 +129,10 @@ export default function MemoryNumberGame() {
           setTimeout(() => {
             if (gameEndedRef.current) return;
             gameEndedRef.current = true;
+            if (isSuperBrain) {
+              handleSuperBrainComplete(level);
+              return;
+            }
             setSequence((seq) => {
               const isFreePointsUsed = isFreePointPlayRef.current;
               isFreePointPlayRef.current = false;
@@ -106,12 +152,20 @@ export default function MemoryNumberGame() {
       });
     }, 1000);
     return () => { if (inputTimerRef.current) clearInterval(inputTimerRef.current); };
-  }, [phase, level]);
+  }, [phase, level, isSuperBrain, handleSuperBrainComplete]);
 
   const startGame = useCallback(() => {
-    setLevel(3);
-    startRound(3);
-  }, [startRound]);
+    setLevel(startLevelParam);
+    startRound(startLevelParam);
+  }, [startRound, startLevelParam]);
+
+  // SuperBrainモード時は自動でゲーム開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startGame();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const handleSubmit = useCallback(() => {
     if (phase !== "input") return;
@@ -122,6 +176,10 @@ export default function MemoryNumberGame() {
         setTimeout(() => {
           if (gameEndedRef.current) return;
           gameEndedRef.current = true;
+          if (isSuperBrain) {
+            handleSuperBrainComplete(MAX_LEVEL);
+            return;
+          }
           const isFreePointsUsed = isFreePointPlayRef.current;
           isFreePointPlayRef.current = false;
           const newBest = saveScore("memory-number", MAX_LEVEL, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
@@ -144,6 +202,10 @@ export default function MemoryNumberGame() {
       setTimeout(() => {
         if (gameEndedRef.current) return;
         gameEndedRef.current = true;
+        if (isSuperBrain) {
+          handleSuperBrainComplete(level);
+          return;
+        }
         const isFreePointsUsed = isFreePointPlayRef.current;
         isFreePointPlayRef.current = false;
         const newBest = saveScore("memory-number", level, getNickname() ?? "ゲスト", getOrInitUserId(), isFreePointsUsed);
@@ -155,14 +217,21 @@ export default function MemoryNumberGame() {
         setPhase("result");
       }, 1200);
     }
-  }, [phase, sequence, input, level, startRound]);
+  }, [phase, sequence, input, level, startRound, isSuperBrain, handleSuperBrainComplete]);
 
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="memory-number"
+          />
+        )}
         <GameHeader title="数字記憶" description="表示された数列を覚えて入力しよう" />
 
-        {phase === "ready" && (
+        {phase === "ready" && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🔢</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -308,7 +377,7 @@ export default function MemoryNumberGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={level}
             best={best}
@@ -322,5 +391,19 @@ export default function MemoryNumberGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MemoryNumberGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <MemoryNumberGameInner />
+    </Suspense>
   );
 }

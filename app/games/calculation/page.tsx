@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -11,23 +11,26 @@ import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
 import CountdownOverlay from "@/components/CountdownOverlay";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "result";
 
 type Question = { a: number; b: number; op: "+" | "-" | "×" | "÷"; answer: number };
 
-function generateQuestion(): Question {
+function generateQuestion(offset: number = 0): Question {
   const ops: ("+" | "-" | "×" | "÷")[] = ["+", "-", "×", "÷"];
   const op = ops[Math.floor(Math.random() * ops.length)];
   let a: number, b: number, answer: number;
   switch (op) {
     case "+":
-      a = Math.floor(Math.random() * 50) + 1;
-      b = Math.floor(Math.random() * 50) + 1;
+      a = Math.floor(Math.random() * (50 + offset)) + 1;
+      b = Math.floor(Math.random() * (50 + offset)) + 1;
       answer = a + b;
       break;
     case "-":
-      a = Math.floor(Math.random() * 50) + 10;
+      a = Math.floor(Math.random() * (50 + offset)) + 10;
       b = Math.floor(Math.random() * a) + 1;
       answer = a - b;
       break;
@@ -46,18 +49,32 @@ function generateQuestion(): Question {
   return { a, b, op, answer };
 }
 
-const GAME_TIME = 30;
-
 const NUMPAD_KEYS = ["1","2","3","4","5","6","7","8","9"] as const;
 
-export default function CalculationGame() {
+function CalculationGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS.calculation[sbDifficulty]
+    : DIFFICULTY_PARAMS.calculation.normal;
+  const gameTime = diffParams.gameTime;
+  const numberOffset = diffParams.numberOffset;
+
   const { pause, resume } = useBGM();
   const [phase, setPhase] = useState<Phase>("ready");
-  const [question, setQuestion] = useState<Question>(generateQuestion());
+  const [question, setQuestion] = useState<Question>(() => generateQuestion(numberOffset));
   const [input, setInput] = useState("");
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_TIME);
+  const [timeLeft, setTimeLeft] = useState(gameTime);
   const [flash, setFlash] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [best, setBest] = useState<number | null>(null);
@@ -68,8 +85,39 @@ export default function CalculationGame() {
   const isFreePointPlayRef = useRef(false);
   const scoreRef = useRef(0);
 
+  const handleSuperBrainComplete = useCallback((score: number) => {
+    const passed = isPassed("calculation", sbDifficulty, score);
+    const threshold = PASS_THRESHOLD["calculation"]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: "calculation",
+          difficulty: sbDifficulty,
+          score,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
   const endGame = useCallback((currentScore: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
+
+    // SuperBrainモードの場合: スコア保存なし・プレイ回数カウントなし・ResultModal非表示
+    if (isSuperBrain) {
+      handleSuperBrainComplete(currentScore);
+      return;
+    }
+
     setFinalScore(currentScore);
     const isFreePointsUsed = isFreePointPlayRef.current;
     isFreePointPlayRef.current = false;
@@ -80,18 +128,26 @@ export default function CalculationGame() {
     setBest(newBest);
     setIsNewBest(newBest === currentScore && currentScore > 0);
     setPhase("result");
-  }, []);
+  }, [isSuperBrain, handleSuperBrainComplete]);
 
   const startGame = useCallback(() => {
     scoreRef.current = 0;
     setScore(0);
-    setTimeLeft(GAME_TIME);
+    setTimeLeft(gameTime);
     setInput("");
-    setQuestion(generateQuestion());
+    setQuestion(generateQuestion(numberOffset));
     setPhase("playing");
-  }, []);
+  }, [gameTime, numberOffset]);
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
+  // SuperBrainモード時は自動でカウントダウン開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startCountdown();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   useEffect(() => {
     setBest(getPersonalBest("calculation"));
@@ -138,12 +194,12 @@ export default function CalculationGame() {
         setScore(scoreRef.current);
         setFlash(true);
         setTimeout(() => setFlash(false), 200);
-        setQuestion(generateQuestion());
+        setQuestion(generateQuestion(numberOffset));
         return "";
       }
       return next;
     });
-  }, [phase, question.answer]);
+  }, [phase, question.answer, numberOffset]);
 
   const timerColor =
     timeLeft > 20 ? "text-green-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
@@ -151,9 +207,16 @@ export default function CalculationGame() {
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
-        <GameHeader title="計算ゲーム" description="30秒間でできるだけ多くの計算問題を解こう" />
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="calculation"
+          />
+        )}
+        <GameHeader title="計算ゲーム" description="制限時間内にできるだけ多くの計算問題を解こう" />
 
-        {phase === "ready" && countdown === null && (
+        {phase === "ready" && countdown === null && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">🧮</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
@@ -234,7 +297,7 @@ export default function CalculationGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={finalScore}
             best={best}
@@ -248,5 +311,19 @@ export default function CalculationGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CalculationGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <CalculationGameInner />
+    </Suspense>
   );
 }

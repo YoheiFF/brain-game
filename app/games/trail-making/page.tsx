@@ -1,6 +1,6 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿"use client";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import GameHeader from "@/components/GameHeader";
 import ResultModal from "@/components/ResultModal";
 import { saveScore, getPersonalBest } from "@/lib/scores";
@@ -11,6 +11,9 @@ import WatchAdButton from "@/components/WatchAdButton";
 import { useBGM } from "@/components/BGMProvider";
 import { useCountdown } from "@/hooks/useCountdown";
 import CountdownOverlay from "@/components/CountdownOverlay";
+import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
+import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
+import SuperBrainBanner from "@/components/SuperBrainBanner";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -29,16 +32,30 @@ interface TrailLine {
 }
 
 const GAME_ID = "trail-making" as const;
-const NODE_COUNT = 20;
-const TIME_LIMIT_SEC = 60;
-const TIME_LIMIT_MS = TIME_LIMIT_SEC * 1000;
 const AREA_W = 280;
 const AREA_H = 380;
 const NODE_RADIUS = 20;
 const MIN_DISTANCE = 55;
 
-export default function TrailMakingGame() {
+function TrailMakingGameInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSuperBrain = searchParams.get("mode") === "superbrain";
+  const sbDifficulty: Difficulty = (searchParams.get("difficulty") ?? "normal") as Difficulty;
+  const sbSessionId = searchParams.get("sessionId") ?? "";
+  const sbChallengeIndex = (() => {
+    const session = isSuperBrain ? loadSession() : null;
+    if (!session) return 0;
+    return session.challengeIndex;
+  })();
+
+  const diffParams = isSuperBrain
+    ? DIFFICULTY_PARAMS["trail-making"][sbDifficulty]
+    : DIFFICULTY_PARAMS["trail-making"].normal;
+  const NODE_COUNT = diffParams.nodeCount;
+  const TIME_LIMIT_SEC = diffParams.timeLimitSec;
+  const TIME_LIMIT_MS = TIME_LIMIT_SEC * 1000;
+
   const { pause, resume } = useBGM();
 
   const [phase, setPhase] = useState<Phase>("ready");
@@ -77,11 +94,35 @@ export default function TrailMakingGame() {
     };
   }, [resume]);
 
-  function generateNodes(): TrailNode[] {
+  const handleSuperBrainComplete = useCallback((finalScore: number) => {
+    const passed = isPassed(GAME_ID, sbDifficulty, finalScore);
+    const threshold = PASS_THRESHOLD[GAME_ID]?.[sbDifficulty] ?? 0;
+    try {
+      const session = loadSession();
+      if (session && session.sessionId === sbSessionId) {
+        const result: ChallengeResult = {
+          gameId: GAME_ID,
+          difficulty: sbDifficulty,
+          score: finalScore,
+          passed,
+          clearThreshold: threshold,
+        };
+        session.results.push(result);
+        saveSession(session);
+      }
+    } catch (e) {
+      console.warn("[SuperBrain] sessionStorage error:", e);
+      router.push(`/superbrain?session=${sbSessionId}&result=ng`);
+      return;
+    }
+    router.push(`/superbrain?session=${sbSessionId}&result=${passed ? "ok" : "ng"}`);
+  }, [sbDifficulty, sbSessionId, router]);
+
+  function generateNodes(nodeCount: number): TrailNode[] {
     const result: TrailNode[] = [];
     let minDist = MIN_DISTANCE;
 
-    for (let id = 1; id <= NODE_COUNT; id++) {
+    for (let id = 1; id <= nodeCount; id++) {
       let placed = false;
       for (let attempt = 0; attempt < 100; attempt++) {
         const x = NODE_RADIUS + Math.floor(Math.random() * (AREA_W - NODE_RADIUS * 2));
@@ -94,10 +135,8 @@ export default function TrailMakingGame() {
         }
       }
       if (!placed) {
-        // MIN_DISTANCEを半分にして再試行（最大1回）
         if (minDist > MIN_DISTANCE / 2) {
           minDist = MIN_DISTANCE / 2;
-          // 同じIDを再試行
           let forcePlaced = false;
           for (let attempt = 0; attempt < 100; attempt++) {
             const x = NODE_RADIUS + Math.floor(Math.random() * (AREA_W - NODE_RADIUS * 2));
@@ -110,11 +149,9 @@ export default function TrailMakingGame() {
             }
           }
           if (!forcePlaced) {
-            // 強制配置
             result.push({ id, x: NODE_RADIUS + (id * 17) % (AREA_W - NODE_RADIUS * 2), y: NODE_RADIUS + (id * 23) % (AREA_H - NODE_RADIUS * 2), tapped: false });
           }
         } else {
-          // 強制配置
           result.push({ id, x: NODE_RADIUS + (id * 17) % (AREA_W - NODE_RADIUS * 2), y: NODE_RADIUS + (id * 23) % (AREA_H - NODE_RADIUS * 2), tapped: false });
         }
       }
@@ -124,6 +161,12 @@ export default function TrailMakingGame() {
 
   const timeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+
+    if (isSuperBrain) {
+      handleSuperBrainComplete(TIME_LIMIT_SEC);
+      return;
+    }
+
     const nickname = getNickname() ?? "ゲスト";
     const userId = getOrInitUserId();
     const isFreePointsUsed = isFreePointPlayRef.current;
@@ -136,12 +179,12 @@ export default function TrailMakingGame() {
     setScore(TIME_LIMIT_SEC);
     setIsNewBest(false);
     setPhase("result");
-  }, []);
+  }, [isSuperBrain, handleSuperBrainComplete, TIME_LIMIT_SEC]);
 
   const startGame = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const newNodes = generateNodes();
+    const newNodes = generateNodes(NODE_COUNT);
     nodesRef.current = newNodes;
     setNodes(newNodes);
     setLines([]);
@@ -163,14 +206,21 @@ export default function TrailMakingGame() {
         timeUp();
       }
     }, 100);
-  }, [timeUp]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [timeUp, NODE_COUNT, TIME_LIMIT_SEC, TIME_LIMIT_MS]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { count: countdown, start: startCountdown } = useCountdown(startGame);
+
+  // SuperBrainモード時は自動でカウントダウン開始
+  useEffect(() => {
+    if (isSuperBrain && phase === "ready") {
+      startCountdown();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperBrain]);
 
   const handleNodeTap = useCallback((nodeId: number) => {
     const currentTarget = nextTargetRef.current;
     if (nodeId === currentTarget) {
-      // 正解
       const tappedNode = nodesRef.current.find((n) => n.id === nodeId);
       const updatedNodes = nodesRef.current.map((n) =>
         n.id === nodeId ? { ...n, tapped: true } : n
@@ -189,10 +239,15 @@ export default function TrailMakingGame() {
       }
 
       if (currentTarget === NODE_COUNT) {
-        // 最後のノードをタップ
         if (timerRef.current) clearInterval(timerRef.current);
         const elapsed = Date.now() - startTimeRef.current;
         const finalScore = parseFloat((elapsed / 1000).toFixed(1));
+
+        if (isSuperBrain) {
+          handleSuperBrainComplete(finalScore);
+          return;
+        }
+
         const nickname = getNickname() ?? "ゲスト";
         const userId = getOrInitUserId();
         const isFreePointsUsed = isFreePointPlayRef.current;
@@ -210,23 +265,29 @@ export default function TrailMakingGame() {
         setNextTarget(currentTarget + 1);
       }
     } else {
-      // 誤タップ
       setWrongId(nodeId);
       setTimeout(() => setWrongId(null), 400);
     }
-  }, []);
+  }, [NODE_COUNT, isSuperBrain, handleSuperBrainComplete]);
 
   return (
     <div className="game-container">
       <div className="w-full max-w-sm">
+        {isSuperBrain && (
+          <SuperBrainBanner
+            challengeIndex={sbChallengeIndex}
+            difficulty={sbDifficulty}
+            gameId="trail-making"
+          />
+        )}
         <GameHeader title="トレイルメイキング" description="1から順番にタップしよう" />
 
-        {phase === "ready" && countdown === null && (
+        {phase === "ready" && countdown === null && !isSuperBrain && (
           <div className="card p-8 flex flex-col items-center gap-6 animate-fade-in">
             <div className="text-6xl">✏️</div>
             <div className="text-center text-[#64748b] text-sm space-y-1">
-              <p>1→2→...→20の順にタップしてください</p>
-              <p>制限時間: <span className="text-white font-bold">60秒</span></p>
+              <p>1→2→...→{NODE_COUNT}の順にタップしてください</p>
+              <p>制限時間: <span className="text-white font-bold">{TIME_LIMIT_SEC}秒</span></p>
               <p>速く完了するほど高スコア！</p>
               {best !== null && <p className="text-[#6c63ff]">ベスト: <span className="font-bold">{best}秒</span></p>}
             </div>
@@ -303,7 +364,7 @@ export default function TrailMakingGame() {
           </div>
         )}
 
-        {phase === "result" && (
+        {phase === "result" && !isSuperBrain && (
           <ResultModal
             score={score}
             best={best}
@@ -323,5 +384,19 @@ export default function TrailMakingGame() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function TrailMakingGame() {
+  return (
+    <Suspense fallback={
+      <div className="game-container">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center text-[#64748b]">読み込み中...</div>
+        </div>
+      </div>
+    }>
+      <TrailMakingGameInner />
+    </Suspense>
   );
 }

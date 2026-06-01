@@ -1,4 +1,6 @@
 import type { GameId } from "./scores"
+import { GAME_IDS } from "./scores"
+import { calcGamePoints } from "./game-points"
 
 export interface Title {
   id: string
@@ -9,7 +11,7 @@ export interface Title {
 }
 
 interface TitleDef extends Title {
-  condition: (bests: Partial<Record<GameId, number>>, totalPlays: number) => boolean
+  condition: (bests: Partial<Record<GameId, number>>, totalPlays: number, sbClears?: number) => boolean
 }
 
 const TITLE_DEFS: TitleDef[] = [
@@ -118,23 +120,67 @@ const TITLE_DEFS: TitleDef[] = [
     rarity: "epic" as const,
     condition: (b: Partial<Record<GameId, number>>) => (b["mental-rotation"] ?? 0) >= 150,
   },
+  {
+    id: "brain_king",
+    name: "頭脳王",
+    icon: "👑",
+    description: "全ゲームで15点以上獲得",
+    rarity: "epic",
+    condition: (b) =>
+      GAME_IDS.every((id) => {
+        const score = b[id];
+        if (score === undefined) return false;
+        return calcGamePoints(id, score) >= 15;
+      }),
+  },
+  {
+    id: "omniscient",
+    name: "全知全能",
+    icon: "✨",
+    description: "全ゲームで20点獲得",
+    rarity: "epic",
+    condition: (b) =>
+      GAME_IDS.every((id) => {
+        const score = b[id];
+        if (score === undefined) return false;
+        return calcGamePoints(id, score) >= 20;
+      }),
+  },
+  {
+    id: "superbrain",
+    name: "SuperBrain",
+    icon: "🧠",
+    description: "SuperBrainモードをクリア",
+    rarity: "rare",
+    condition: (_b, _p, sbClears = 0) => sbClears >= 1,
+  },
+  {
+    id: "ultrabrain",
+    name: "UltraBrain",
+    icon: "⚡🧠",
+    description: "SuperBrainモードを10回クリア",
+    rarity: "epic",
+    condition: (_b, _p, sbClears = 0) => sbClears >= 10,
+  },
 ]
 
 export function getEarnedTitles(
   bests: Partial<Record<GameId, number>>,
-  totalPlays: number
+  totalPlays: number,
+  sbClears = 0
 ): Title[] {
   return TITLE_DEFS
-    .filter((def) => def.condition(bests, totalPlays))
+    .filter((def) => def.condition(bests, totalPlays, sbClears))
     .map(({ condition: _c, ...title }) => title)
 }
 
 export function getAllTitles(
   bests: Partial<Record<GameId, number>>,
-  totalPlays: number
+  totalPlays: number,
+  sbClears = 0
 ): (Title & { earned: boolean })[] {
   return TITLE_DEFS.map(({ condition, ...title }) => ({
     ...title,
-    earned: condition(bests, totalPlays),
+    earned: condition(bests, totalPlays, sbClears),
   }))
 }
