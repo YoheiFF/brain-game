@@ -14,6 +14,7 @@ import CountdownOverlay from "@/components/CountdownOverlay";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "playing" | "result";
 type SubPhase = "showing-number" | "showing-ops" | "answering";
@@ -236,6 +237,7 @@ function RunningTotalGameInner() {
     const isCorrect = chosen !== null && chosen === round.answer;
     setSelectedChoice(chosen);
     setFeedback(isCorrect ? "correct" : "incorrect");
+    if (isCorrect) playCorrect(); else playIncorrect();
 
     setScore((prev) => {
       const newScore = isCorrect ? prev + 1 : prev;

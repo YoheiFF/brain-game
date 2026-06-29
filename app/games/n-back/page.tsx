@@ -14,6 +14,7 @@ import CountdownOverlay from "@/components/CountdownOverlay";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -246,6 +247,7 @@ function NBackGameInner() {
       correctRef.current++;
       setCorrectCount(correctRef.current);
       setFeedbackType("hit");
+      playCorrect();
 
       // 正解数に応じて速度ステージを更新
       const newStage = getStageIndex(correctRef.current);
@@ -258,6 +260,7 @@ function NBackGameInner() {
       missRef.current++;
       setMissCount(missRef.current);
       setFeedbackType("miss");
+      playIncorrect();
     }
 
     setTimeout(() => setFeedbackType(null), 400);

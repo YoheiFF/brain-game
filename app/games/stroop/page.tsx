@@ -14,6 +14,7 @@ import CountdownOverlay from "@/components/CountdownOverlay";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -174,6 +175,7 @@ function StroopGameInner() {
     if (phase !== "playing" || feedback !== null) return;
     const isCorrect = choice === question.correctAnswer;
     setFeedback(isCorrect ? "correct" : "wrong");
+    if (isCorrect) playCorrect(); else playIncorrect();
     if (isCorrect) {
       scoreRef.current += 1;
       setScore((s) => s + 1);

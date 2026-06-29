@@ -12,6 +12,7 @@ import { useBGM } from "@/components/BGMProvider";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -140,6 +141,7 @@ function PatternGameInner() {
       const newScore = patternCount;
       setScore(newScore);
       setPhase("correct");
+      playCorrect();
       setTimeout(() => {
         const next = level + 1;
         setLevel(next);
@@ -149,6 +151,7 @@ function PatternGameInner() {
       const wrong = new Set([...selected].filter((c) => !pattern.has(c)));
       setWrongCells(wrong);
       setPhase("wrong");
+      playIncorrect();
       setTimeout(() => {
         const currentScore = score;
         if (isSuperBrain) {

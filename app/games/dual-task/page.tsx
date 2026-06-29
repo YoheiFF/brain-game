@@ -14,6 +14,7 @@ import CountdownOverlay from "@/components/CountdownOverlay";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "playing" | "result";
 type LeftShape = "○" | "△" | "□" | "★";
@@ -249,10 +250,12 @@ function DualTaskGameInner() {
       leftCorrectRef.current++;
       setLeftCorrect(leftCorrectRef.current);
       setLeftFeedback("ok");
+      playCorrect();
     } else {
       totalMissRef.current++;
       setMissCount(totalMissRef.current);
       setLeftFeedback("ng");
+      playIncorrect();
     }
 
     setTimeout(() => setLeftFeedback(null), 300);
@@ -272,10 +275,12 @@ function DualTaskGameInner() {
       rightCorrectRef.current++;
       setRightCorrect(rightCorrectRef.current);
       setRightFeedback("ok");
+      playCorrect();
     } else {
       totalMissRef.current++;
       setMissCount(totalMissRef.current);
       setRightFeedback("ng");
+      playIncorrect();
     }
 
     setTimeout(() => setRightFeedback(null), 300);

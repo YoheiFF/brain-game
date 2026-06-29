@@ -12,6 +12,7 @@ import { useBGM } from "@/components/BGMProvider";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "waiting" | "go" | "tooEarly" | "result";
 
@@ -122,6 +123,7 @@ function ReactionGameInner() {
     if (phase === "waiting") {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setPhase("tooEarly");
+      playIncorrect();
       setTimeout(() => startRound(), 1500);
       return;
     }

@@ -12,6 +12,7 @@ import { useBGM } from "@/components/BGMProvider";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "showing" | "input" | "correct" | "wrong" | "result";
 
@@ -126,6 +127,7 @@ function MemoryNumberGameInner() {
         if (t <= 1) {
           clearInterval(inputTimerRef.current!);
           setPhase("wrong");
+          playIncorrect();
           setTimeout(() => {
             if (gameEndedRef.current) return;
             gameEndedRef.current = true;
@@ -172,6 +174,7 @@ function MemoryNumberGameInner() {
     const correct = sequence.join("");
     if (input === correct) {
       setPhase("correct");
+      playCorrect();
       if (level >= MAX_LEVEL) {
         setTimeout(() => {
           if (gameEndedRef.current) return;
@@ -199,6 +202,7 @@ function MemoryNumberGameInner() {
       }
     } else {
       setPhase("wrong");
+      playIncorrect();
       setTimeout(() => {
         if (gameEndedRef.current) return;
         gameEndedRef.current = true;

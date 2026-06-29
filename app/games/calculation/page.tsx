@@ -14,6 +14,7 @@ import CountdownOverlay from "@/components/CountdownOverlay";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "playing" | "result";
 
@@ -192,6 +193,7 @@ function CalculationGameInner() {
       if (!isNaN(val) && val === question.answer) {
         scoreRef.current += 1;
         setScore(scoreRef.current);
+        playCorrect();
         setFlash(true);
         setTimeout(() => setFlash(false), 200);
         setQuestion(generateQuestion(numberOffset));

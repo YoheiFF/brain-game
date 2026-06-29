@@ -12,6 +12,7 @@ import { useBGM } from "@/components/BGMProvider";
 import { DIFFICULTY_PARAMS, PASS_THRESHOLD, isPassed, type Difficulty } from "@/lib/difficulty";
 import { loadSession, saveSession, type ChallengeResult } from "@/lib/superbrain-session";
 import SuperBrainBanner from "@/components/SuperBrainBanner";
+import { playCorrect, playIncorrect } from "@/lib/sfx";
 
 type Phase = "ready" | "playing" | "feedback" | "result";
 type Verdict = "same" | "mirror";
@@ -188,6 +189,7 @@ function MentalRotationGameInner() {
         if (answeredRef.current) return;
         answeredRef.current = true;
         setLastVerdict("timeout");
+        playIncorrect();
         setPhase("feedback");
 
         setTimeout(() => {
@@ -241,8 +243,10 @@ function MentalRotationGameInner() {
       correctCountRef.current++;
       setCorrectCount(correctCountRef.current);
       setLastVerdict("correct");
+      playCorrect();
     } else {
       setLastVerdict("wrong");
+      playIncorrect();
     }
 
     setPhase("feedback");
